@@ -1,0 +1,72 @@
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+## Build artifacts
+artifacts/
+publish/
+
+## Installer output
+installer/
+
+## NuGet
+**/packages/*
+*.nupkg
+**/[Pp]ackages/**
+
+## .NET
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## WPF temporary files
+*_wpftmp/
+
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+## AI / IDE tool configs (personal, not project code)
+.copilot/
+.cursorrules
+.kiro/
+.trae/
+.vscode/
+
+## Environment / secrets
+.env
+.env.*
+*.secret
+secrets.json
+appsettings.Development.json
+
+## OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes

@@ -1,0 +1,97 @@
+using Xunit;
+using LumiDesk.Services;
+using LumiDesk.Models;
+using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.IO;
+using LumiDesk.Helpers;
+
+namespace LumiDesk.Tests;
+
+[Collection("Database Tests")]
+public class ShortcutServiceTests
+{
+    private string _testDbFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test_shortcut.db");
+
+    private async Task<(DatabaseService db, ShortcutService svc)> InitAsync()
+    {
+        var connectionString = $"Data Source={_testDbFile}";
+        var db = new DatabaseService(connectionString);
+        await db.InitializeAsync();
+        var svc = new ShortcutService(db);
+        return (db, svc);
+    }
+
+    private void Cleanup()
+    {
+        try
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(_testDbFile))
+            {
+                File.Delete(_testDbFile);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    [Fact]
+    public async Task CreateShortcutAsync_ShouldInsertAndReturnId()
+    {
+        var (db, svc) = await InitAsync();
+
+        var shortcut = new ShortcutItem
+        {
+            Name = "Test App",
+            Path = "C:\\Windows\\notepad.exe",
+            Type = ShortcutType.Application,
+            SortOrder = 0
+        };
+
+        var id = await svc.CreateShortcutAsync(shortcut);
+        Assert.True(id > 0);
+
+        var fetched = await svc.GetShortcutAsync(id);
+        Assert.NotNull(fetched);
+        Assert.Equal("Test App", fetched!.Name);
+        Assert.Equal("C:\\Windows\\notepad.exe", fetched.Path);
+
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task UpdateSortOrderAsync_ShouldUpdateOrders()
+    {
+        var (db, svc) = await InitAsync();
+
+        var id1 = await svc.CreateShortcutAsync(new ShortcutItem { Name = "App 1", Path = "path1" });
+        var id2 = await svc.CreateShortcutAsync(new ShortcutItem { Name = "App 2", Path = "path2" });
+
+        await svc.UpdateSortOrderAsync(new List<int> { id2, id1 });
+
+        var s1 = await svc.GetShortcutAsync(id1);
+        var s2 = await svc.GetShortcutAsync(id2);
+
+        Assert.Equal(1, s1!.SortOrder);
+        Assert.Equal(0, s2!.SortOrder);
+
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task DeleteShortcutAsync_ShouldRemoveShortcut()
+    {
+        var (db, svc) = await InitAsync();
+
+        var id = await svc.CreateShortcutAsync(new ShortcutItem { Name = "To Delete", Path = "path" });
+        Assert.NotNull(await svc.GetShortcutAsync(id));
+
+        await svc.DeleteShortcutAsync(id);
+        Assert.Null(await svc.GetShortcutAsync(id));
+
+        Cleanup();
+    }
+}
