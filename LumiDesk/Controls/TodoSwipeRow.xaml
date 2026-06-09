@@ -1,0 +1,36 @@
+<UserControl x:Class="LumiDesk.Controls.TodoSwipeRow"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:LumiDesk.Controls"
+             ClipToBounds="True">
+    <Grid x:Name="RootGrid" Height="46">
+        <Border x:Name="DeleteStrip"
+                HorizontalAlignment="Right"
+                Width="72"
+                CornerRadius="8"
+                Background="#E53935"
+                Visibility="Collapsed">
+            <Button Content="删除"
+                    Foreground="White"
+                    FontSize="12"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Cursor="Hand"
+                    Click="DeleteButton_OnClick"/>
+        </Border>
+
+        <Border x:Name="SwipeSurface"
+                Background="{DynamicResource PrimaryBackgroundBrush}"
+                CornerRadius="6"
+                PreviewMouseLeftButtonDown="SwipeSurface_OnPreviewMouseLeftButtonDown"
+                PreviewMouseMove="SwipeSurface_OnPreviewMouseMove"
+                PreviewMouseLeftButtonUp="SwipeSurface_OnPreviewMouseLeftButtonUp"
+                MouseLeave="SwipeSurface_OnMouseLeave">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="SwipeTransform"/>
+            </Border.RenderTransform>
+            <ContentPresenter x:Name="ContentHost"
+                              Content="{Binding RowContent, RelativeSource={RelativeSource AncestorType=controls:TodoSwipeRow}}"/>
+        </Border>
+    </Grid>
+</UserControl>
