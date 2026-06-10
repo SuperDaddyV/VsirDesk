@@ -40,12 +40,15 @@ AppMutex={#MyAppMutex}
 SetupIconFile={#MyAppIconSourceDir}\{#MyAppIconName}
 UninstallDisplayIcon={app}\icon\{#MyAppIconName}
 
+[Languages]
+Name: "chinesesimp"; MessagesFile: "installer-assets\ChineseSimplified.isl"
+
 [CustomMessages]
-LaunchProgram=Launch %1
+chinesesimp.LaunchProgram=启动 %1
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "startupicon"; Description: "Start UniDesk when Windows starts"; GroupDescription: "Startup options"; Flags: unchecked
+Name: "startupicon"; Description: "开机自动启动"; GroupDescription: "启动选项"; Flags: unchecked
 
 [Dirs]
 ; UniDesk stores user data in LocalAppData. Keep these directories after uninstall by default.
