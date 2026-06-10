@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  English | <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   <a href="#features">Features</a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="#hardware-monitor">Hardware Monitor</a> ·
@@ -30,7 +34,7 @@ UniDesk is a compact personal desktop hub for Windows. It stays on the edge of y
 ## Screenshots
 
 <p align="center">
-  <img src="images/unidesk-main-panel.png" alt="UniDesk main panel" width="330">
+  <img src="images/unidesk-main-panel.png" alt="UniDesk main panel" width="360">
 </p>
 
 <p align="center">
@@ -61,27 +65,26 @@ Auto location uses the current network exit IP. It usually works well on normal 
 
 ## Install
 
-Download a release package from GitHub Releases, extract it, and run:
+Download the latest installer from GitHub Releases and run:
 
 ```powershell
-UniDesk.exe
+UniDesk_Setup_1.1.0.exe
 ```
 
 System requirements:
 
 - Windows 10 1903 or later
 - Windows 11
-- .NET 9 Desktop Runtime
 
 ## Build
 
 ```powershell
 dotnet restore
 dotnet build --configuration Release
-dotnet publish .\UniDesk\UniDesk.csproj -c Release -o publish --self-contained false
+dotnet publish .\UniDesk\UniDesk.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish\win-x64
 ```
 
-Published files are written to the `publish` directory.
+Published files are written to the `publish\win-x64` directory.
 
 ## Data Compatibility
 

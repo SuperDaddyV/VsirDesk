@@ -3,14 +3,13 @@
 ;
 ; Recommended build command:
 ;   dotnet publish UniDesk\UniDesk.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish\win-x64
-; If you use the recommended command, change MyAppSourceDir below to "publish\win-x64".
 
 #define MyAppName "UniDesk"
 #define MyAppVersion "1.1.0"
 #define MyAppPublisher "UniDesk"
-#define MyAppURL "https://www.example.com/"
+#define MyAppURL "https://github.com/SuperDaddyV/UniDesk"
 #define MyAppExeName "UniDesk.exe"
-#define MyAppSourceDir "UniDesk\bin\Release\net9.0-windows10.0.18362.0"
+#define MyAppSourceDir "publish\win-x64"
 #define MyAppIconSourceDir "UniDesk\icon"
 #define MyAppIconName "unidesk1-removebg-preview.ico"
 #define MyAppMutex "UniDesk_SingleInstance_Mutex_6B9BD6F1-8E3A-4C5D-9F2B-1A7C8D3E5F9A"
@@ -41,15 +40,12 @@ AppMutex={#MyAppMutex}
 SetupIconFile={#MyAppIconSourceDir}\{#MyAppIconName}
 UninstallDisplayIcon={app}\icon\{#MyAppIconName}
 
-[Languages]
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
-
 [CustomMessages]
-chinesesimp.LaunchProgram=启动 %1
+LaunchProgram=Launch %1
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "startupicon"; Description: "开机自动启动"; GroupDescription: "启动选项"; Flags: unchecked
+Name: "startupicon"; Description: "Start UniDesk when Windows starts"; GroupDescription: "Startup options"; Flags: unchecked
 
 [Dirs]
 ; UniDesk stores user data in LocalAppData. Keep these directories after uninstall by default.
@@ -63,9 +59,8 @@ Name: "{localappdata}\UniDesk\cache"
 Source: "{#MyAppSourceDir}\*"; DestDir: "{app}"; Excludes: "icon\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Package the complete icon assets from the project source directory.
 Source: "{#MyAppIconSourceDir}\*"; DestDir: "{app}\icon"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Package secrets.json (built-in default API credentials, not tracked in git).
-; This file must exist in the project source directory before packaging.
-Source: "UniDesk\secrets.json"; DestDir: "{app}"; Flags: ignoreversion
+; Package optional local secrets.json when present.
+Source: "UniDesk\secrets.json"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon\{#MyAppIconName}"
