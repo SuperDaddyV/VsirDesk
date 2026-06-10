@@ -1,6 +1,6 @@
-# LumiDesk 开发计划与任务清单
+# UniDesk 开发计划与任务清单
 
-**项目**：LumiDesk - Windows 11 桌面侧边助手  
+**项目**：UniDesk - Windows 11 桌面侧边助手  
 **更新日期**：2026年5月20日
 **文档版本**：1.5
 
@@ -52,7 +52,7 @@
 - [x] 先写 `DatabaseService` 与 `SettingsService` 的基础测试
 
 **完成标志**
-- [x] 首次启动能自动创建 `%LOCALAPPDATA%\LumiDesk\LumiDesk.db`
+- [x] 首次启动能自动创建 `%LOCALAPPDATA%\UniDesk\UniDesk.db`
 - [x] 重启后能读回默认设置与已修改设置
 
 ### Step 3：先验证主窗口壳子与 Windows 11 外观 ✅
@@ -195,8 +195,8 @@
 ### 1.1 项目结构创建
 
 - [ ] 创建解决方案和项目文件
-  - [ ] LumiDesk.csproj（主程序）
-  - [ ] LumiDesk.Tests.csproj（测试项目）
+  - [ ] UniDesk.csproj（主程序）
+  - [ ] UniDesk.Tests.csproj（测试项目）
   
 - [ ] 按规范创建目录结构
   - [ ] Views/
@@ -267,13 +267,13 @@
 ### 1.4 数据库初始化
 
 - [ ] 创建本地数据目录
-  - [ ] `%LOCALAPPDATA%\LumiDesk\`
+  - [ ] `%LOCALAPPDATA%\UniDesk\`
   - [ ] `icons\`
   - [ ] `logs\`
   - [ ] 临时导入导出目录
 
 - [ ] 实现 DatabaseService
-  - [ ] 数据库文件位置：`%LOCALAPPDATA%\LumiDesk\LumiDesk.db`
+  - [ ] 数据库文件位置：`%LOCALAPPDATA%\UniDesk\UniDesk.db`
   - [ ] 自动创建目录结构
   - [ ] 执行数据库迁移（版本检查）
 
@@ -456,7 +456,7 @@
   - [ ] 用户可在设置中切换
 
 - [ ] 实现标题栏
-  - [ ] 显示应用名称 "LumiDesk"
+  - [ ] 显示应用名称 "UniDesk"
   - [ ] 设置按钮 (打开 SettingsWindow)
   - [ ] 最小化按钮 (隐藏到托盘)
   - [ ] 标题栏 Drag 移动窗口支持
@@ -505,7 +505,7 @@
   - [ ] 定位失败时提示用户在 SettingsWindow 中手动指定城市
 
 - [ ] 实现天气缓存机制
-  - [ ] 缓存位置：`%LOCALAPPDATA%\LumiDesk\weather_cache.json`
+  - [ ] 缓存位置：`%LOCALAPPDATA%\UniDesk\weather_cache.json`
   - [ ] 缓存有效期：30 分钟
   - [ ] JSON 序列化/反序列化
 
@@ -605,7 +605,7 @@
   - [ ] .exe 文件 → Icon.ExtractAssociatedIcon()
   - [ ] .lnk 快捷方式 → 通过 COM 获取目标图标
   - [ ] 文件夹 → 使用系统文件夹图标
-  - [ ] 图标保存到：`%LOCALAPPDATA%\LumiDesk\icons\`
+  - [ ] 图标保存到：`%LOCALAPPDATA%\UniDesk\icons\`
 
 - [ ] 实现拖拽排序
   - [ ] 支持拖拽重排
@@ -703,8 +703,8 @@
   - [ ] EnableStartup() → 写入 Windows 注册表
     ```
     HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
-    Key: "LumiDesk"
-    Value: "C:\Path\To\LumiDesk.exe"
+    Key: "UniDesk"
+    Value: "C:\Path\To\UniDesk.exe"
     ```
   - [ ] DisableStartup() → 删除注册表项
   - [ ] IsStartupEnabled() → 读取注册表状态
@@ -751,7 +751,7 @@
 - [ ] 实现导出功能
   - [ ] SaveFileDialog 让用户选择目标路径
   - [ ] 导出前释放数据库文件句柄并暂停新写入
-  - [ ] 复制 LumiDesk.db 文件到目标位置
+  - [ ] 复制 UniDesk.db 文件到目标位置
   - [ ] 支持取消导出任务
   - [ ] 显示成功提示
 
@@ -786,7 +786,7 @@
 ### 3.8 错误处理与日志
 
 - [ ] 创建日志系统
-  - [ ] 记录到 `%LOCALAPPDATA%\LumiDesk\logs\`
+  - [ ] 记录到 `%LOCALAPPDATA%\UniDesk\logs\`
   - [ ] 按日期生成日志文件
   - [ ] 记录所有异常和关键操作
 
@@ -861,7 +861,7 @@
 
 - [ ] 设置页与数据
   - [ ] 打开设置页加载当前配置；保存成功后关闭；取消不保存；保存失败提示并保持窗口打开
-  - [ ] 导出数据库：复制 LumiDesk.db 到用户选择路径
+  - [ ] 导出数据库：复制 UniDesk.db 到用户选择路径
   - [ ] 导入数据库：无效/损坏时提示“导入失败：文件格式无效或已损坏”，且保留原数据库不变；成功后覆盖并提示重启
   - [ ] 恢复默认布局：重置 WidgetLayout 与 PanelWidth 并立即应用
   - [ ] 开机自启动开关打开/关闭时同步注册表状态；失败时恢复开关

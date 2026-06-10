@@ -1,0 +1,423 @@
+using Xunit;
+using UniDesk.Services;
+using UniDesk.Helpers;
+
+namespace UniDesk.Tests;
+
+[Collection("Database Tests")]
+public class DatabaseServiceTests
+{
+    private string _testDbFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test_db.db");
+
+    private DatabaseService GetService()
+    {
+        return new DatabaseService($"Data Source={_testDbFile}");
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateDatabaseFile()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        Assert.True(System.IO.File.Exists(_testDbFile));
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateSettingsTable()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Settings'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateNotesTable()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Notes'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateTodosTable()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Todos'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateShortcutsTable()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Shortcuts'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateNotesIndex()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_notes_updated_at'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateTodosIndexes()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var dueDateIndex = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_todos_due_date'",
+            reader => reader.GetInt32(0)
+        );
+
+        var createdAtIndex = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_todos_created_at'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, dueDateIndex);
+        Assert.Equal(1, createdAtIndex);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateShortcutsIndex()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_shortcuts_sort_order'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldInitializeDefaultSettings()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var theme = await databaseService.QuerySingleAsync<string>(
+            "SELECT Value FROM Settings WHERE Key = 'Theme'",
+            reader => reader.GetString(0)
+        );
+
+        Assert.Equal("System", theme);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldInitializeAllDefaultSettings()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var settings = await databaseService.QueryAsync<string>(
+            "SELECT Key FROM Settings ORDER BY Key",
+            reader => reader.GetString(0)
+        );
+
+        var expectedKeys = new[]
+        {
+            "AutoLocation",
+            "City",
+            "ColorScheme",
+            "DatabaseVersion",
+            "DefaultWeatherApiHostEnc",
+            "DefaultWeatherApiKeyEnc",
+            "Hotkey",
+            "PanelCollapsed",
+            "PanelWidth",
+            "ShortcutMaxCount",
+            "Startup",
+            "Theme",
+            "TopMost",
+            "WeatherApiHost",
+            "WeatherApiKey",
+            "WidgetLayout",
+            "WindowLeft",
+            "WindowLocked",
+            "WindowOpacity",
+            "WindowTop"
+        };
+        Assert.Equal(expectedKeys.Length, settings.Count);
+        
+        foreach (var key in expectedKeys)
+        {
+            Assert.Contains(key, settings);
+        }
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldSetDatabaseVersion()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var version = await databaseService.QuerySingleAsync<string>(
+            "SELECT Value FROM Settings WHERE Key = 'DatabaseVersion'",
+            reader => reader.GetString(0)
+        );
+
+        Assert.Equal("1.3", version);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldNotRecreateTablesOnSecondCall()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+        
+        await databaseService.ExecuteNonQueryAsync(
+            "INSERT INTO Notes (Title, Content, Color, CreatedAt, UpdatedAt) VALUES (@p0, @p1, @p2, @p3, @p4)",
+            "Test Note", "Test Content", "#FFFFFF", DateTime.UtcNow.ToString("o"), DateTime.UtcNow.ToString("o")
+        );
+
+        await databaseService.InitializeAsync();
+
+        var count = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM Notes",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, count);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task ExecuteNonQueryAsync_ShouldInsertRecord()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.ExecuteNonQueryAsync(
+            "INSERT INTO Notes (Title, Content, Color, CreatedAt, UpdatedAt) VALUES (@p0, @p1, @p2, @p3, @p4)",
+            "Test Note", "Test Content", "#FFFFFF", DateTime.UtcNow.ToString("o"), DateTime.UtcNow.ToString("o")
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task ExecuteNonQueryAsync_ShouldUpdateRecord()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        await databaseService.ExecuteNonQueryAsync(
+            "INSERT INTO Notes (Title, Content, Color, CreatedAt, UpdatedAt) VALUES (@p0, @p1, @p2, @p3, @p4)",
+            "Test Note", "Test Content", "#FFFFFF", DateTime.UtcNow.ToString("o"), DateTime.UtcNow.ToString("o")
+        );
+
+        var result = await databaseService.ExecuteNonQueryAsync(
+            "UPDATE Notes SET Title = @p0 WHERE Title = @p1",
+            "Updated Note", "Test Note"
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task ExecuteNonQueryAsync_ShouldDeleteRecord()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        await databaseService.ExecuteNonQueryAsync(
+            "INSERT INTO Notes (Title, Content, Color, CreatedAt, UpdatedAt) VALUES (@p0, @p1, @p2, @p3, @p4)",
+            "Test Note", "Test Content", "#FFFFFF", DateTime.UtcNow.ToString("o"), DateTime.UtcNow.ToString("o")
+        );
+
+        var result = await databaseService.ExecuteNonQueryAsync(
+            "DELETE FROM Notes WHERE Title = @p0",
+            "Test Note"
+        );
+
+        Assert.Equal(1, result);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task QueryAsync_ShouldReturnMultipleRecords()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        await databaseService.ExecuteNonQueryAsync(
+            "INSERT INTO Notes (Title, Content, Color, CreatedAt, UpdatedAt) VALUES (@p0, @p1, @p2, @p3, @p4)",
+            "Note 1", "Content 1", "#FFFFFF", DateTime.UtcNow.ToString("o"), DateTime.UtcNow.ToString("o")
+        );
+
+        await databaseService.ExecuteNonQueryAsync(
+            "INSERT INTO Notes (Title, Content, Color, CreatedAt, UpdatedAt) VALUES (@p0, @p1, @p2, @p3, @p4)",
+            "Note 2", "Content 2", "#FFFFFF", DateTime.UtcNow.ToString("o"), DateTime.UtcNow.ToString("o")
+        );
+
+        var notes = await databaseService.QueryAsync<string>(
+            "SELECT Title FROM Notes ORDER BY Title",
+            reader => reader.GetString(0)
+        );
+
+        Assert.Equal(2, notes.Count);
+        Assert.Equal("Note 1", notes[0]);
+        Assert.Equal("Note 2", notes[1]);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task QueryAsync_ShouldReturnEmptyListWhenNoRecords()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var notes = await databaseService.QueryAsync<string>(
+            "SELECT Title FROM Notes",
+            reader => reader.GetString(0)
+        );
+
+        Assert.Empty(notes);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task QuerySingleAsync_ShouldReturnSingleRecord()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        await databaseService.ExecuteNonQueryAsync(
+            "INSERT INTO Notes (Title, Content, Color, CreatedAt, UpdatedAt) VALUES (@p0, @p1, @p2, @p3, @p4)",
+            "Test Note", "Test Content", "#FFFFFF", DateTime.UtcNow.ToString("o"), DateTime.UtcNow.ToString("o")
+        );
+
+        var title = await databaseService.QuerySingleAsync<string>(
+            "SELECT Title FROM Notes WHERE Title = @p0",
+            reader => reader.GetString(0),
+            "Test Note"
+        );
+
+        Assert.Equal("Test Note", title);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task QuerySingleAsync_ShouldReturnNullWhenNoRecord()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var title = await databaseService.QuerySingleAsync<string>(
+            "SELECT Title FROM Notes WHERE Title = @p0",
+            reader => reader.GetString(0),
+            "NonExistent"
+        );
+
+        Assert.Null(title);
+        
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task QuerySingleAsync_ShouldHandleComplexObject()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        await databaseService.ExecuteNonQueryAsync(
+            "INSERT INTO Todos (Title, IsCompleted, DueDate, CreatedAt) VALUES (@p0, @p1, @p2, @p3)",
+            "Test Todo", 1, "2026-12-31", DateTime.UtcNow.ToString("o")
+        );
+
+        var todo = await databaseService.QuerySingleAsync<(string Title, bool IsCompleted)>(
+            "SELECT Title, IsCompleted FROM Todos WHERE Title = @p0",
+            reader => (reader.GetString(0), reader.GetInt32(1) == 1),
+            "Test Todo"
+        );
+
+        Assert.Equal("Test Todo", todo.Title);
+        Assert.True(todo.IsCompleted);
+        
+        Cleanup();
+    }
+
+    private void Cleanup()
+    {
+        try
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (System.IO.File.Exists(_testDbFile))
+            {
+                System.IO.File.Delete(_testDbFile);
+            }
+        }
+        catch
+        {
+        }
+    }
+}
