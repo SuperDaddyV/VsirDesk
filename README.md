@@ -1,4 +1,4 @@
-# VsirDesk
+# UniDesk
 
 <p align="center">
   <img src="LumiDesk/icon/lumidesk1.png" alt="VsirDesk Logo" width="120">
@@ -20,7 +20,7 @@
 
 ## 简介
 
-VsirDesk 是基于 LumiDesk 改造的 Windows 桌面侧边工具。它可以贴在桌面边缘，常驻显示常用信息，并支持收起、置顶、调整透明度和面板宽度。
+UniDesk 是基于 LumiDesk 改造的 Windows 桌面侧边工具。它可以贴在桌面边缘，常驻显示常用信息，并支持收起、置顶、调整透明度和面板宽度。
 
 本版本新增了内置硬件监视模块，直接集成在主面板中，位于“天气时间”和“快捷方式”之间。它不是单独悬浮窗，因此可以跟随 VsirDesk 的主题、透明度、宽度和面板设置统一管理。
 
@@ -90,4 +90,4 @@ dotnet publish .\LumiDesk\LumiDesk.csproj -c Release -o publish --self-contained
 
 ## 说明
 
-这是个人定制版，保留原 LumiDesk 的核心桌面小工具体验，并加入硬件监视和 VsirDesk 命名调整。
+这是个人定制版，保留原 LumiDesk 的核心桌面小工具体验，并加入硬件监视和 UniDesk 自定义命名调整。
