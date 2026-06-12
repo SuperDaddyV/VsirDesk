@@ -25,13 +25,13 @@
 
 UniDesk is a compact desktop sidebar for Windows. It stays on the edge of your desktop and keeps daily information, quick actions, lightweight hardware status, and todo items in one themeable panel.
 
-The goal is to provide a calm personal desktop center: always visible when needed, easy to collapse when not needed, and simple enough to run as a daily utility.
+The goal is to provide a calm personal desktop center: always visible when needed, easy to collapse when not needed, flexible enough for different screen sizes, and simple enough to run as a daily utility.
 
 ## Credits
 
 UniDesk is developed based on [Happyeveryweek/LumiDesk](https://github.com/Happyeveryweek/LumiDesk). Thanks to the original author for the idea, foundation, and implementation of the desktop widget experience.
 
-This project keeps the spirit of LumiDesk while adding project rebranding, integrated hardware monitoring, network speed display, updated layout, bilingual documentation, and installer packaging.
+This project keeps the spirit of LumiDesk while adding project rebranding, integrated hardware monitoring, network speed display, updated layout, panel personalization, bilingual documentation, and installer packaging.
 
 ## Features
 
@@ -40,7 +40,8 @@ This project keeps the spirit of LumiDesk while adding project rebranding, integ
 - **Quick Shortcuts**: pin apps, folders, and files for one-click access.
 - **Todo List**: manage tasks with priority, due date, completion state, backup, and restore.
 - **Built-in Calendar**: open a desktop calendar panel with solar and lunar dates.
-- **Personalized Panel**: adjust theme colors, transparency, width, topmost, lock, collapse, and shortcut count.
+- **Personalized Panel**: adjust display title, theme colors, transparency, width, height, font size, topmost, lock, collapse, and shortcut count.
+- **Weather API Settings**: configure weather API host and key from the settings panel.
 - **Local-first Data**: settings, shortcuts, and todos are stored locally.
 
 ## Screenshots
@@ -51,10 +52,16 @@ This project keeps the spirit of LumiDesk while adding project rebranding, integ
   <img src="images/unidesk-main-panel.png" alt="UniDesk main panel" width="360">
 </p>
 
-### Settings
+### Personalization Settings
 
 <p align="center">
-  <img src="images/unidesk-settings-panel.png" alt="UniDesk settings panel" width="360">
+  <img src="images/unidesk-settings-panel.png" alt="UniDesk personalization settings" width="360">
+</p>
+
+### System & Weather API Settings
+
+<p align="center">
+  <img src="images/unidesk-settings-system.png" alt="UniDesk system and weather API settings" width="360">
 </p>
 
 ### Calendar
@@ -86,7 +93,7 @@ Auto location uses the current network exit IP. It usually works well on normal 
 Download the latest installer from [GitHub Releases](https://github.com/SuperDaddyV/UniDesk/releases/latest) and run:
 
 ```powershell
-UniDesk_Setup_1.1.1.exe
+UniDesk_Setup_1.1.4.exe
 ```
 
 System requirements:
