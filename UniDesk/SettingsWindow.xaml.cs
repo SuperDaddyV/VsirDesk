@@ -266,7 +266,9 @@ public partial class SettingsWindow : Window
     private void ContentScrollViewer_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         var source = e.OriginalSource as DependencyObject;
-        if (IsInsideElement(source, WeatherApiHostTextBox) || IsInsideElement(source, WeatherApiKeyTextBox))
+        if (IsInsideElement(source, DisplayTitleTextBox) ||
+            IsInsideElement(source, WeatherApiHostTextBox) ||
+            IsInsideElement(source, WeatherApiKeyTextBox))
         {
             return;
         }
@@ -328,6 +330,18 @@ public partial class SettingsWindow : Window
             Keyboard.Focus(textBox);
             e.Handled = true;
         }
+    }
+
+    private void EditableTextBox_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not TextBox textBox || textBox.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        textBox.Focus();
+        Keyboard.Focus(textBox);
+        e.Handled = true;
     }
 
     private static bool CanStartScrollDrag(DependencyObject? source)
