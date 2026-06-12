@@ -8,6 +8,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.IO;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -39,6 +42,15 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private int _shortcutsLoadGeneration;
     private int? _shortcutLimitPreview;
     private bool _disposed;
+    private bool _isLoadingModuleSettings;
+
+    private static readonly JsonSerializerOptions ModuleSettingsJsonOptions = new()
+    {
+        WriteIndented = false,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     [ObservableProperty]
     private bool _isTopMost = true;
@@ -67,7 +79,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private string _displayTitle = "UniDesk";
 
     [ObservableProperty]
+    private int _moduleLayoutVersion;
+
+    [ObservableProperty]
     private bool _isEditingShortcuts;
+
+    [ObservableProperty]
+    private bool _isShortcutDropTargetActive;
 
     [ObservableProperty]
     private string _clockTimeText = "--:--";
@@ -105,6 +123,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>快捷方式区展示项（含末尾添加按钮占位）。</summary>
     public ObservableCollection<object> ShortcutDisplayEntries { get; } = new();
+
+    public ObservableCollection<ModuleSetting> ModuleSettings { get; } = new();
+
+    public bool HasShortcuts => Shortcuts.Count > 0;
 
     [ObservableProperty]
     private bool _isShortcutAddMenuOpen;
@@ -221,7 +243,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         RefreshCalendarDays();
 
         _weatherRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-        _weatherRefreshTimer.Tick += (_, _) => _ = RefreshWeatherCoreAsync(notifyUser: false);
+        _weatherRefreshTimer.Tick += (_, _) =>
+        {
+            if (IsModuleEnabled(DashboardModuleIds.TimeWeather))
+            {
+                _ = RefreshWeatherCoreAsync(notifyUser: false);
+            }
+        };
         _weatherRefreshTimer.Start();
 
         _systemMetricsTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
@@ -257,7 +285,90 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         FontScale = savedFontScale;
 
         DisplayTitle = NormalizeDisplayTitle(_settingsService.GetValue("DisplayTitle", "UniDesk"));
+        LoadModuleSettings();
     }
+
+    private void LoadModuleSettings()
+    {
+        if (_isLoadingModuleSettings)
+        {
+            return;
+        }
+
+        _isLoadingModuleSettings = true;
+        try
+        {
+            var json = _settingsService.GetValue(DashboardModuleCatalog.SettingsKey, string.Empty);
+            var modules = DeserializeModuleSettings(json);
+            ApplyModuleSettingsCore(modules, persist: string.IsNullOrWhiteSpace(json));
+        }
+        finally
+        {
+            _isLoadingModuleSettings = false;
+        }
+    }
+
+    private static List<ModuleSetting> DeserializeModuleSettings(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return DashboardModuleCatalog.CreateDefaultModules();
+        }
+
+        try
+        {
+            var modules = JsonSerializer.Deserialize<List<ModuleSetting>>(json, ModuleSettingsJsonOptions);
+            return DashboardModuleCatalog.Normalize(modules);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "MainWindowViewModel.DeserializeModuleSettings");
+            return DashboardModuleCatalog.CreateDefaultModules();
+        }
+    }
+
+    public List<ModuleSetting> GetModuleSettingsSnapshot() =>
+        DashboardModuleCatalog.Normalize(ModuleSettings.Select(module => module.Clone()));
+
+    public void ApplyModuleSettings(IEnumerable<ModuleSetting> modules, bool persist) =>
+        ApplyModuleSettingsCore(modules, persist);
+
+    private void ApplyModuleSettingsCore(IEnumerable<ModuleSetting> modules, bool persist)
+    {
+        var normalized = DashboardModuleCatalog.Normalize(modules);
+
+        ModuleSettings.Clear();
+        foreach (var module in normalized)
+        {
+            ModuleSettings.Add(module);
+        }
+
+        ModuleLayoutVersion++;
+
+        if (persist)
+        {
+            SaveModuleSettings();
+        }
+
+        if (IsModuleEnabled(DashboardModuleIds.HardwareMonitor))
+        {
+            UpdateSystemMetrics();
+        }
+
+        if (IsModuleEnabled(DashboardModuleIds.TimeWeather) && !HasWeatherData)
+        {
+            _ = InitializeWeatherAsync();
+        }
+    }
+
+    private void SaveModuleSettings()
+    {
+        var json = JsonSerializer.Serialize(GetModuleSettingsSnapshot(), ModuleSettingsJsonOptions);
+        _settingsService.SetValue(DashboardModuleCatalog.SettingsKey, json);
+    }
+
+    public bool IsModuleEnabled(string moduleId) =>
+        ModuleSettings.FirstOrDefault(module => module.ModuleId == moduleId)?.IsEnabled ?? true;
 
     public void UpdatePanelWidth(double width)
     {
@@ -819,7 +930,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _ = CreateShortcutAndReloadAsync(ShortcutPathHelper.CreateFromPath(path, Shortcuts.Count));
+        _ = AddShortcutsFromPathsAsync([path]);
     }
 
     [RelayCommand]
@@ -837,14 +948,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var path = folderDialog.FolderName;
-        _ = CreateShortcutAndReloadAsync(new ShortcutItem
-        {
-            Name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
-            Path = path,
-            Type = ShortcutType.Folder,
-            SortOrder = Shortcuts.Count
-        });
+        _ = AddShortcutsFromPathsAsync([folderDialog.FolderName]);
     }
 
     [RelayCommand]
@@ -880,8 +984,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private static bool IsDuplicateShortcut(IEnumerable<ShortcutItem> existing, ShortcutItem candidate)
     {
+        var candidatePath = NormalizeShortcutPath(candidate.Path);
         return existing.Any(s =>
-            string.Equals(s.Path, candidate.Path, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(NormalizeShortcutPath(s.Path), candidatePath, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(s.LaunchArguments ?? string.Empty, candidate.LaunchArguments ?? string.Empty, StringComparison.Ordinal));
     }
 
@@ -912,6 +1017,112 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         await LoadShortcutsAsync();
     }
 
+    public async Task<ShortcutImportResult> AddShortcutsFromPathsAsync(IEnumerable<string>? paths)
+    {
+        var result = new ShortcutImportResult();
+        var incomingPaths = paths?
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
+
+        if (incomingPaths.Count == 0)
+        {
+            result.InvalidCount++;
+            return result;
+        }
+
+        try
+        {
+            var allShortcuts = await _shortcutService.GetAllShortcutsAsync();
+            var maxCount = GetShortcutMaxCount();
+            var existingPaths = allShortcuts
+                .Select(shortcut => NormalizeShortcutPath(shortcut.Path))
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var path in incomingPaths)
+            {
+                if (!ShortcutPathHelper.IsSupportedPath(path))
+                {
+                    result.InvalidCount++;
+                    continue;
+                }
+
+                var normalizedPath = NormalizeShortcutPath(path);
+                if (existingPaths.Contains(normalizedPath))
+                {
+                    result.DuplicateCount++;
+                    continue;
+                }
+
+                if (allShortcuts.Count >= maxCount)
+                {
+                    result.LimitSkippedCount++;
+                    continue;
+                }
+
+                try
+                {
+                    var shortcut = ShortcutPathHelper.CreateFromPath(path, allShortcuts.Count);
+                    var id = await _shortcutService.CreateShortcutAsync(shortcut);
+                    if (id <= 0)
+                    {
+                        result.InvalidCount++;
+                        continue;
+                    }
+
+                    shortcut.Id = id;
+                    allShortcuts.Add(shortcut);
+                    existingPaths.Add(normalizedPath);
+                    result.AddedCount++;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, $"MainWindowViewModel.AddShortcutFromPath: {path}");
+                    result.InvalidCount++;
+                }
+            }
+
+            if (result.HasChanges)
+            {
+                await LoadShortcutsAsync();
+            }
+
+            if (result.AddedCount > 0)
+            {
+                _notificationService.ShowSuccessMessage(result.ToUserMessage());
+            }
+            else if (result.DuplicateCount > 0 || result.InvalidCount > 0 || result.LimitSkippedCount > 0)
+            {
+                _notificationService.ShowWarningMessage(result.ToUserMessage());
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "MainWindowViewModel.AddShortcutsFromPathsAsync");
+            _notificationService.ShowErrorMessage("拖拽添加快捷方式失败，请稍后重试。");
+            result.InvalidCount += incomingPaths.Count;
+            return result;
+        }
+    }
+
+    private static string NormalizeShortcutPath(string path)
+    {
+        try
+        {
+            var expanded = Environment.ExpandEnvironmentVariables(path).Trim();
+            var fullPath = Path.GetFullPath(expanded);
+            return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch
+        {
+            return path.Trim();
+        }
+    }
+
     private void RefreshShortcutDisplayEntries()
     {
         ShortcutDisplayEntries.Clear();
@@ -924,6 +1135,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             ShortcutDisplayEntries.Add(AddShortcutPlaceholder.Instance);
         }
+
+        OnPropertyChanged(nameof(HasShortcuts));
     }
 
     [RelayCommand]
@@ -1013,6 +1226,11 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private async Task RefreshWeatherCoreAsync(bool notifyUser)
     {
+        if (!IsModuleEnabled(DashboardModuleIds.TimeWeather))
+        {
+            return;
+        }
+
         _weatherRefreshCts?.Cancel();
         _weatherRefreshCts?.Dispose();
         _weatherRefreshCts = new CancellationTokenSource();
@@ -1138,6 +1356,11 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private void UpdateSystemMetrics()
     {
+        if (!IsModuleEnabled(DashboardModuleIds.HardwareMonitor))
+        {
+            return;
+        }
+
         try
         {
             var metrics = _systemMetricsService.Read();

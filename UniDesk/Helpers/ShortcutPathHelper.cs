@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using UniDesk.Models;
 
 namespace UniDesk.Helpers;
@@ -15,8 +16,7 @@ public static class ShortcutPathHelper
 
     public static ShortcutItem CreateFromPath(string path, int sortOrder)
     {
-        var name = ShellLinkHelper.TryGetShortcutDisplayName(path)
-                   ?? Path.GetFileNameWithoutExtension(path);
+        var name = GetDisplayName(path);
 
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -39,5 +39,69 @@ public static class ShortcutPathHelper
             Type = type,
             SortOrder = sortOrder
         };
+    }
+
+    public static bool IsSupportedPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            return File.Exists(path) || Directory.Exists(path);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string GetDisplayName(string path)
+    {
+        if (path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+        {
+            var shortcutName = Path.GetFileNameWithoutExtension(path);
+            if (!string.IsNullOrWhiteSpace(shortcutName))
+            {
+                return shortcutName;
+            }
+
+            var resolvedName = ShellLinkHelper.TryGetShortcutDisplayName(path);
+            if (!string.IsNullOrWhiteSpace(resolvedName))
+            {
+                return resolvedName;
+            }
+        }
+
+        if (path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var versionInfo = FileVersionInfo.GetVersionInfo(path);
+                var name = versionInfo.FileDescription;
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = versionInfo.ProductName;
+                }
+
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    return name.Trim();
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        var fallback = Path.GetFileNameWithoutExtension(path);
+        if (!string.IsNullOrWhiteSpace(fallback))
+        {
+            return fallback;
+        }
+
+        return Path.GetFileName(path);
     }
 }

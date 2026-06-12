@@ -52,6 +52,10 @@ public partial class MainWindow : Window
         {
             ApplyPanelCollapseState();
         }
+        else if (e.PropertyName == nameof(MainWindowViewModel.ModuleLayoutVersion))
+        {
+            ApplyModuleLayout();
+        }
     }
 
     private void ApplyPanelCollapseState()
@@ -84,6 +88,8 @@ public partial class MainWindow : Window
             MainModulesGrid.RowDefinitions[2].Height = new GridLength(26, GridUnitType.Star);
             MainModulesGrid.RowDefinitions[3].Height = new GridLength(34, GridUnitType.Star);
         }
+
+        ApplyModuleLayout();
 
         if (!_suppressPositionSave)
         {
@@ -129,7 +135,91 @@ public partial class MainWindow : Window
     {
         UpdateWindowContainerClip();
         _viewModel.ApplyWindowSettings();
+        ApplyModuleLayout();
     }
+
+    private void ApplyModuleLayout()
+    {
+        if (MainModulesGrid.RowDefinitions.Count < 4)
+        {
+            return;
+        }
+
+        var modules = _viewModel.GetModuleSettingsSnapshot()
+            .Where(module => module.IsEnabled)
+            .Select(module => new
+            {
+                module.ModuleId,
+                Element = GetModuleElement(module.ModuleId),
+                Weight = GetModuleWeight(module.ModuleId)
+            })
+            .Where(module => module.Element != null)
+            .ToList();
+
+        var visibleModules = _viewModel.IsPanelCollapsed
+            ? modules.Take(1).ToList()
+            : modules;
+
+        foreach (var element in GetAllModuleElements())
+        {
+            element.Visibility = Visibility.Collapsed;
+        }
+
+        for (var row = 0; row < MainModulesGrid.RowDefinitions.Count; row++)
+        {
+            MainModulesGrid.RowDefinitions[row].Height = new GridLength(0);
+        }
+
+        for (var row = 0; row < visibleModules.Count; row++)
+        {
+            var module = visibleModules[row];
+            var element = module.Element!;
+            Grid.SetRow(element, row);
+            element.Visibility = Visibility.Visible;
+            element.Margin = row == visibleModules.Count - 1
+                ? new Thickness(0)
+                : new Thickness(0, 0, 0, 6);
+
+            MainModulesGrid.RowDefinitions[row].Height = _viewModel.IsPanelCollapsed
+                ? new GridLength(1, GridUnitType.Star)
+                : new GridLength(module.Weight, GridUnitType.Star);
+        }
+
+        EmptyModulesMessage.Visibility = modules.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        if (modules.Count == 0)
+        {
+            MainModulesGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+        }
+    }
+
+    private FrameworkElement? GetModuleElement(string moduleId) => moduleId switch
+    {
+        DashboardModuleIds.TimeWeather => TimeWeatherModule,
+        DashboardModuleIds.HardwareMonitor => HardwareMonitorModule,
+        DashboardModuleIds.Shortcuts => ShortcutsModule,
+        DashboardModuleIds.Todos => TodosModule,
+        _ => null
+    };
+
+    private IEnumerable<FrameworkElement> GetAllModuleElements()
+    {
+        yield return TimeWeatherModule;
+        yield return HardwareMonitorModule;
+        yield return ShortcutsModule;
+        yield return TodosModule;
+    }
+
+    private static double GetModuleWeight(string moduleId) => moduleId switch
+    {
+        DashboardModuleIds.TimeWeather => 24,
+        DashboardModuleIds.HardwareMonitor => 16,
+        DashboardModuleIds.Shortcuts => 26,
+        DashboardModuleIds.Todos => 34,
+        _ => 20
+    };
 
     private void WindowContainer_OnSizeChanged(object sender, SizeChangedEventArgs e) =>
         UpdateWindowContainerClip();
@@ -391,6 +481,65 @@ public partial class MainWindow : Window
             e.Effects = DragDropEffects.Move;
             e.Handled = true;
         }
+    }
+
+    private void ShortcutModule_OnPreviewDragEnter(object sender, DragEventArgs e) =>
+        UpdateShortcutFileDropFeedback(e);
+
+    private void ShortcutModule_OnPreviewDragOver(object sender, DragEventArgs e) =>
+        UpdateShortcutFileDropFeedback(e);
+
+    private void ShortcutModule_OnPreviewDragLeave(object sender, DragEventArgs e)
+    {
+        if (!IsShortcutFileDrop(e))
+        {
+            return;
+        }
+
+        _viewModel.IsShortcutDropTargetActive = false;
+        e.Handled = true;
+    }
+
+    private async void ShortcutModule_OnPreviewDrop(object sender, DragEventArgs e)
+    {
+        if (!IsShortcutFileDrop(e))
+        {
+            return;
+        }
+
+        e.Effects = DragDropEffects.Copy;
+        e.Handled = true;
+        _viewModel.IsShortcutDropTargetActive = false;
+
+        var paths = GetFileDropPaths(e);
+        await _viewModel.AddShortcutsFromPathsAsync(paths);
+    }
+
+    private void UpdateShortcutFileDropFeedback(DragEventArgs e)
+    {
+        if (!IsShortcutFileDrop(e))
+        {
+            return;
+        }
+
+        e.Effects = DragDropEffects.Copy;
+        _viewModel.IsShortcutDropTargetActive = true;
+        e.Handled = true;
+    }
+
+    private static bool IsShortcutFileDrop(DragEventArgs e) =>
+        e.Data.GetDataPresent(DataFormats.FileDrop) && GetFileDropPaths(e).Count > 0;
+
+    private static IReadOnlyList<string> GetFileDropPaths(DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths)
+        {
+            return [];
+        }
+
+        return paths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .ToList();
     }
 
     private void ShortcutAddPopup_OnClosed(object? sender, EventArgs e)

@@ -150,7 +150,8 @@
                         <RowDefinition Height="34*"/>
                     </Grid.RowDefinitions>
 
-                        <Border Grid.Row="0"
+                        <Border x:Name="TimeWeatherModule"
+                                Grid.Row="0"
                                 Margin="0,0,0,6"
                                 ClipToBounds="True">
                             <Border.Style>
@@ -609,12 +610,12 @@
                             </Grid>
                         </Border>
 
-                        <Border Grid.Row="1"
+                        <Border x:Name="HardwareMonitorModule"
+                                Grid.Row="1"
                                 Style="{StaticResource ModuleCardStyle}"
                                 Margin="0,0,0,6"
                                 Padding="13,8"
-                                ClipToBounds="True"
-                                Visibility="{Binding IsPanelCollapsed, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                ClipToBounds="True">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -760,12 +761,17 @@
                             </Grid>
                         </Border>
 
-                        <Border Grid.Row="2"
+                        <Border x:Name="ShortcutsModule"
+                                Grid.Row="2"
                                 Style="{StaticResource ModuleCardStyle}"
                                 Margin="0,0,0,6"
                                 Padding="12,10"
                                 ClipToBounds="True"
-                                Visibility="{Binding IsPanelCollapsed, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                AllowDrop="True"
+                                PreviewDragEnter="ShortcutModule_OnPreviewDragEnter"
+                                PreviewDragOver="ShortcutModule_OnPreviewDragOver"
+                                PreviewDragLeave="ShortcutModule_OnPreviewDragLeave"
+                                PreviewDrop="ShortcutModule_OnPreviewDrop">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -1043,15 +1049,43 @@
                                     </ItemsControl.Resources>
                                 </ItemsControl>
                                 </ScrollViewer>
+
+                                <TextBlock Grid.Row="1"
+                                           Text="暂无快捷方式，可点击添加，或直接拖入应用、文件、文件夹"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
+                                           TextWrapping="Wrap"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Margin="24,8"
+                                           IsHitTestVisible="False"
+                                           Visibility="{Binding HasShortcuts, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+
+                                <Border Grid.RowSpan="2"
+                                        CornerRadius="10"
+                                        Background="{DynamicResource GlassHighlightBrush}"
+                                        BorderBrush="{DynamicResource PrimaryTextBrush}"
+                                        BorderThickness="1.2"
+                                        Opacity="0.88"
+                                        IsHitTestVisible="False"
+                                        Visibility="{Binding IsShortcutDropTargetActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <TextBlock Text="松开以添加快捷方式"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=12}"
+                                               FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
                             </Grid>
                         </Border>
 
-                        <Border Grid.Row="3"
+                        <Border x:Name="TodosModule"
+                                Grid.Row="3"
                                 Style="{StaticResource ModuleCardStyle}"
                                 Margin="0"
                                 Padding="14,12"
-                                ClipToBounds="True"
-                                Visibility="{Binding IsPanelCollapsed, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                ClipToBounds="True">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -1193,6 +1227,18 @@
                                 </ScrollViewer>
                             </Grid>
                         </Border>
+
+                        <TextBlock x:Name="EmptyModulesMessage"
+                                   Grid.RowSpan="4"
+                                   Text="暂无启用模块，请在设置中开启"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=12}"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   Margin="20"
+                                   Visibility="Collapsed"/>
                 </Grid>
             </Grid>
         </Border>

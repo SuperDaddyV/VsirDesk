@@ -74,7 +74,7 @@ public class WeatherService : IWeatherService, IDisposable
                 cancellationToken,
                 legacyHost: "devapi.qweather.com",
                 legacyPath: "/v7/weather/now");
-            var weatherResult = JsonSerializer.Deserialize<QWeatherNowResponse>(weatherResponse);
+            var weatherResult = DeserializeJson<QWeatherNowResponse>(weatherResponse);
 
             if (weatherResult?.Code != "200")
             {
@@ -94,7 +94,7 @@ public class WeatherService : IWeatherService, IDisposable
                 cancellationToken,
                 legacyHost: "devapi.qweather.com",
                 legacyPath: "/v7/weather/3d");
-            var forecastResult = JsonSerializer.Deserialize<QWeatherForecastResponse>(forecastResponse);
+            var forecastResult = DeserializeJson<QWeatherForecastResponse>(forecastResponse);
             var todayForecast = forecastResult?.Daily?.FirstOrDefault();
 
             var airPath = $"/airquality/v1/current/{location.Value.Lat}/{location.Value.Lon}";
@@ -104,7 +104,7 @@ public class WeatherService : IWeatherService, IDisposable
                 cancellationToken,
                 legacyHost: "devapi.qweather.com",
                 legacyPath: airPath);
-            var airResult = JsonSerializer.Deserialize<QWeatherAirQualityResponse>(airResponse);
+            var airResult = DeserializeJson<QWeatherAirQualityResponse>(airResponse);
 
             var info = new WeatherInfo
             {
@@ -289,7 +289,7 @@ public class WeatherService : IWeatherService, IDisposable
                 cancellationToken,
                 legacyHost: "geoapi.qweather.com",
                 legacyPath: "/v2/city/lookup");
-            var result = JsonSerializer.Deserialize<QWeatherGeoResponse>(response);
+            var result = DeserializeJson<QWeatherGeoResponse>(response);
 
             if (result?.Code == "200" && result.Locations?.Count > 0)
             {
@@ -373,6 +373,16 @@ public class WeatherService : IWeatherService, IDisposable
         catch
         {
         }
+    }
+
+    private static T? DeserializeJson<T>(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return default;
+        }
+
+        return JsonSerializer.Deserialize<T>(json);
     }
 
     public void Dispose()

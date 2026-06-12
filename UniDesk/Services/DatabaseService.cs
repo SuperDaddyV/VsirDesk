@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using UniDesk.Helpers;
+using UniDesk.Models;
 
 namespace UniDesk.Services;
 
@@ -143,7 +144,8 @@ public class DatabaseService : IDatabaseService
             { "WeatherApiHost", "" },
             { WeatherApiDefaults.DefaultApiKeySettingKey, WeatherApiDefaults.BuiltInApiKeyEncrypted },
             { WeatherApiDefaults.DefaultApiHostSettingKey, WeatherApiDefaults.BuiltInApiHostEncrypted },
-            { "ShortcutMaxCount", "9" }
+            { "ShortcutMaxCount", "9" },
+            { DashboardModuleCatalog.SettingsKey, "[{\"moduleId\":\"TimeWeather\",\"displayName\":\"时间天气\",\"isEnabled\":true,\"sortOrder\":0},{\"moduleId\":\"HardwareMonitor\",\"displayName\":\"硬件监视\",\"isEnabled\":true,\"sortOrder\":1},{\"moduleId\":\"Shortcuts\",\"displayName\":\"快捷方式\",\"isEnabled\":true,\"sortOrder\":2},{\"moduleId\":\"Todos\",\"displayName\":\"待办事项\",\"isEnabled\":true,\"sortOrder\":3}]" }
         };
 
         foreach (var setting in defaultSettings)

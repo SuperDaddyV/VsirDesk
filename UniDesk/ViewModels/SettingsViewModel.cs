@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using UniDesk.Helpers;
+using UniDesk.Models;
 using UniDesk.Services;
 
 namespace UniDesk.ViewModels;
@@ -56,6 +58,10 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private int _shortcutMaxCount = ShortcutLimitHelper.DefaultLimit;
+
+    public ObservableCollection<ModuleSettingOptionViewModel> ModuleSettings { get; } = new();
+
+    private List<ModuleSetting> _originalModuleSettings = [];
 
     public string FontScaleLabel => FontScale switch
     {
@@ -119,6 +125,7 @@ public partial class SettingsViewModel : ObservableObject
             WeatherApiHost = _settingsService.GetValue("WeatherApiHost", "");
             ShortcutMaxCount = ShortcutLimitHelper.ParseLimit(
                 _settingsService.GetValue("ShortcutMaxCount", ShortcutLimitHelper.DefaultLimit.ToString()));
+            LoadModuleSettings(_mainWindowViewModel.GetModuleSettingsSnapshot());
 
             PanelWidth = Math.Clamp(PanelWidth, IWindowService.MinPanelWidth, IWindowService.MaxPanelWidth);
             PanelHeight = Math.Clamp(PanelHeight, IWindowService.MinPanelHeight, IWindowService.MaxPanelHeight);
@@ -146,6 +153,7 @@ public partial class SettingsViewModel : ObservableObject
         _originalSettings["WeatherApiKey"] = WeatherApiKey;
         _originalSettings["WeatherApiHost"] = WeatherApiHost;
         _originalSettings["ShortcutMaxCount"] = ShortcutMaxCount.ToString(CultureInfo.InvariantCulture);
+        _originalModuleSettings = ModuleSettings.Select(module => module.ToModel().Clone()).ToList();
     }
 
     [RelayCommand]
@@ -174,6 +182,44 @@ public partial class SettingsViewModel : ObservableObject
         ShortcutMaxCount = limit;
     }
 
+    [RelayCommand]
+    private void MoveModuleUp(ModuleSettingOptionViewModel? module)
+    {
+        if (module == null)
+        {
+            return;
+        }
+
+        var index = ModuleSettings.IndexOf(module);
+        if (index <= 0)
+        {
+            return;
+        }
+
+        ModuleSettings.Move(index, index - 1);
+        RefreshModuleSortState();
+        ApplyModulePreview();
+    }
+
+    [RelayCommand]
+    private void MoveModuleDown(ModuleSettingOptionViewModel? module)
+    {
+        if (module == null)
+        {
+            return;
+        }
+
+        var index = ModuleSettings.IndexOf(module);
+        if (index < 0 || index >= ModuleSettings.Count - 1)
+        {
+            return;
+        }
+
+        ModuleSettings.Move(index, index + 1);
+        RefreshModuleSortState();
+        ApplyModulePreview();
+    }
+
     partial void OnSelectedColorSchemeChanged(string value)
     {
         UpdateColorSchemeSelection();
@@ -199,6 +245,60 @@ public partial class SettingsViewModel : ObservableObject
 
     partial void OnShortcutMaxCountChanged(int value) =>
         _mainWindowViewModel.SetShortcutLimitPreview(value);
+
+    private void LoadModuleSettings(IEnumerable<ModuleSetting> modules)
+    {
+        foreach (var module in ModuleSettings)
+        {
+            module.PropertyChanged -= ModuleSetting_OnPropertyChanged;
+        }
+
+        ModuleSettings.Clear();
+        foreach (var module in DashboardModuleCatalog.Normalize(modules))
+        {
+            var option = ModuleSettingOptionViewModel.FromModel(module);
+            option.PropertyChanged += ModuleSetting_OnPropertyChanged;
+            ModuleSettings.Add(option);
+        }
+
+        RefreshModuleSortState();
+    }
+
+    private void ModuleSetting_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_isLoading || e.PropertyName != nameof(ModuleSettingOptionViewModel.IsEnabled))
+        {
+            return;
+        }
+
+        ApplyModulePreview();
+    }
+
+    private void RefreshModuleSortState()
+    {
+        for (var i = 0; i < ModuleSettings.Count; i++)
+        {
+            ModuleSettings[i].SortOrder = i;
+            ModuleSettings[i].CanMoveUp = i > 0;
+            ModuleSettings[i].CanMoveDown = i < ModuleSettings.Count - 1;
+        }
+    }
+
+    private List<ModuleSetting> BuildModuleSettings()
+    {
+        RefreshModuleSortState();
+        return DashboardModuleCatalog.Normalize(ModuleSettings.Select(module => module.ToModel()));
+    }
+
+    private void ApplyModulePreview()
+    {
+        if (_isLoading)
+        {
+            return;
+        }
+
+        _mainWindowViewModel.ApplyModuleSettings(BuildModuleSettings(), persist: false);
+    }
 
     private void UpdateColorSchemeSelection()
     {
@@ -257,6 +357,7 @@ public partial class SettingsViewModel : ObservableObject
             _settingsService.SetValue("WeatherApiKey", apiKeyToValidate);
             _settingsService.SetValue("WeatherApiHost", apiHostToValidate);
             _settingsService.SetValue("ShortcutMaxCount", ShortcutMaxCount.ToString(CultureInfo.InvariantCulture));
+            _mainWindowViewModel.ApplyModuleSettings(BuildModuleSettings(), persist: true);
 
             await _settingsService.FlushPendingSavesAsync();
 
@@ -341,6 +442,8 @@ public partial class SettingsViewModel : ObservableObject
         WeatherApiHost = "";
         IsEditingWeatherApi = false;
         ShortcutMaxCount = ShortcutLimitHelper.DefaultLimit;
+        LoadModuleSettings(DashboardModuleCatalog.CreateDefaultModules());
+        ApplyModulePreview();
 
         _notificationService.ShowInfoMessage("已恢复默认设置，点击保存后生效");
     }
@@ -490,6 +593,8 @@ public partial class SettingsViewModel : ObservableObject
             {
                 ShortcutMaxCount = ShortcutLimitHelper.ParseLimit(shortcutMaxCount);
             }
+
+            LoadModuleSettings(_originalModuleSettings);
         }
         finally
         {
@@ -500,6 +605,7 @@ public partial class SettingsViewModel : ObservableObject
         ApplyWindowPreview();
         _mainWindowViewModel.SetShortcutLimitPreview(null);
         _ = _mainWindowViewModel.ReloadShortcutsAsync();
+        _mainWindowViewModel.ApplyModuleSettings(_originalModuleSettings, persist: false);
     }
 
     private bool ReadStartupSetting()
