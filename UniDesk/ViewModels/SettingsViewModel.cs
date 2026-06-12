@@ -37,6 +37,15 @@ public partial class SettingsViewModel : ObservableObject
     private double _panelWidth;
 
     [ObservableProperty]
+    private double _panelHeight;
+
+    [ObservableProperty]
+    private double _fontScale = 1.0;
+
+    [ObservableProperty]
+    private string _displayTitle = "UniDesk";
+
+    [ObservableProperty]
     private string _weatherApiKey = string.Empty;
 
     [ObservableProperty]
@@ -47,6 +56,13 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private int _shortcutMaxCount = ShortcutLimitHelper.DefaultLimit;
+
+    public string FontScaleLabel => FontScale switch
+    {
+        <= 0.95 => "小",
+        >= 1.1 => "大",
+        _ => "标准"
+    };
 
     public ObservableCollection<ColorSchemeOptionViewModel> ColorSchemes { get; } = new();
 
@@ -96,10 +112,17 @@ public partial class SettingsViewModel : ObservableObject
             StartupEnabled = ReadStartupSetting();
             WindowOpacity = _settingsService.GetSetting("WindowOpacity", 0.70);
             PanelWidth = _settingsService.GetSetting("PanelWidth", 320.0);
+            PanelHeight = _settingsService.GetSetting("PanelHeight", 702.0);
+            FontScale = _settingsService.GetSetting("FontScale", 1.0);
+            DisplayTitle = MainWindowViewModel.NormalizeDisplayTitle(_settingsService.GetValue("DisplayTitle", "UniDesk"));
             WeatherApiKey = _settingsService.GetValue("WeatherApiKey", "");
             WeatherApiHost = _settingsService.GetValue("WeatherApiHost", "");
             ShortcutMaxCount = ShortcutLimitHelper.ParseLimit(
                 _settingsService.GetValue("ShortcutMaxCount", ShortcutLimitHelper.DefaultLimit.ToString()));
+
+            PanelWidth = Math.Clamp(PanelWidth, IWindowService.MinPanelWidth, IWindowService.MaxPanelWidth);
+            PanelHeight = Math.Clamp(PanelHeight, IWindowService.MinPanelHeight, IWindowService.MaxPanelHeight);
+            FontScale = Math.Clamp(FontScale, 0.9, 1.18);
         }
         finally
         {
@@ -117,6 +140,9 @@ public partial class SettingsViewModel : ObservableObject
         _originalSettings["Startup"] = StartupEnabled.ToString();
         _originalSettings["WindowOpacity"] = WindowOpacity.ToString(CultureInfo.InvariantCulture);
         _originalSettings["PanelWidth"] = PanelWidth.ToString(CultureInfo.InvariantCulture);
+        _originalSettings["PanelHeight"] = PanelHeight.ToString(CultureInfo.InvariantCulture);
+        _originalSettings["FontScale"] = FontScale.ToString(CultureInfo.InvariantCulture);
+        _originalSettings["DisplayTitle"] = DisplayTitle;
         _originalSettings["WeatherApiKey"] = WeatherApiKey;
         _originalSettings["WeatherApiHost"] = WeatherApiHost;
         _originalSettings["ShortcutMaxCount"] = ShortcutMaxCount.ToString(CultureInfo.InvariantCulture);
@@ -161,6 +187,16 @@ public partial class SettingsViewModel : ObservableObject
 
     partial void OnPanelWidthChanged(double value) => ApplyWindowPreview();
 
+    partial void OnPanelHeightChanged(double value) => ApplyWindowPreview();
+
+    partial void OnFontScaleChanged(double value)
+    {
+        OnPropertyChanged(nameof(FontScaleLabel));
+        ApplyWindowPreview();
+    }
+
+    partial void OnDisplayTitleChanged(string value) => ApplyWindowPreview();
+
     partial void OnShortcutMaxCountChanged(int value) =>
         _mainWindowViewModel.SetShortcutLimitPreview(value);
 
@@ -181,8 +217,16 @@ public partial class SettingsViewModel : ObservableObject
 
         _windowService.SetOpacity(WindowOpacity);
         _windowService.SetWidth(PanelWidth);
+        if (!_mainWindowViewModel.IsPanelCollapsed)
+        {
+            _windowService.SetHeight(PanelHeight);
+        }
+
         _mainWindowViewModel.WindowOpacity = WindowOpacity;
         _mainWindowViewModel.PanelWidth = PanelWidth;
+        _mainWindowViewModel.PanelHeight = PanelHeight;
+        _mainWindowViewModel.FontScale = FontScale;
+        _mainWindowViewModel.DisplayTitle = MainWindowViewModel.NormalizeDisplayTitle(DisplayTitle);
     }
 
     [RelayCommand]
@@ -197,6 +241,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             apiKeyToValidate = WeatherApiKey.Trim();
             apiHostToValidate = QWeatherApiClient.NormalizeHost(WeatherApiHost.Trim());
+            DisplayTitle = MainWindowViewModel.NormalizeDisplayTitle(DisplayTitle);
             weatherSettingsChanged =
                 _originalSettings.GetValueOrDefault("WeatherApiKey") != apiKeyToValidate ||
                 _originalSettings.GetValueOrDefault("WeatherApiHost") != apiHostToValidate;
@@ -206,6 +251,9 @@ public partial class SettingsViewModel : ObservableObject
             _settingsService.SetValue("Startup", StartupEnabled.ToString());
             _settingsService.SetValue("WindowOpacity", WindowOpacity.ToString(CultureInfo.InvariantCulture));
             _settingsService.SetValue("PanelWidth", PanelWidth.ToString(CultureInfo.InvariantCulture));
+            _settingsService.SetValue("PanelHeight", PanelHeight.ToString(CultureInfo.InvariantCulture));
+            _settingsService.SetValue("FontScale", FontScale.ToString(CultureInfo.InvariantCulture));
+            _settingsService.SetValue("DisplayTitle", MainWindowViewModel.NormalizeDisplayTitle(DisplayTitle));
             _settingsService.SetValue("WeatherApiKey", apiKeyToValidate);
             _settingsService.SetValue("WeatherApiHost", apiHostToValidate);
             _settingsService.SetValue("ShortcutMaxCount", ShortcutMaxCount.ToString(CultureInfo.InvariantCulture));
@@ -286,6 +334,9 @@ public partial class SettingsViewModel : ObservableObject
         StartupEnabled = false;
         WindowOpacity = 0.70;
         PanelWidth = 320;
+        PanelHeight = 702;
+        FontScale = 1.0;
+        DisplayTitle = "UniDesk";
         WeatherApiKey = "";
         WeatherApiHost = "";
         IsEditingWeatherApi = false;
@@ -410,6 +461,21 @@ public partial class SettingsViewModel : ObservableObject
                 PanelWidth = double.Parse(width, CultureInfo.InvariantCulture);
             }
 
+            if (_originalSettings.TryGetValue("PanelHeight", out var height))
+            {
+                PanelHeight = double.Parse(height, CultureInfo.InvariantCulture);
+            }
+
+            if (_originalSettings.TryGetValue("FontScale", out var fontScale))
+            {
+                FontScale = double.Parse(fontScale, CultureInfo.InvariantCulture);
+            }
+
+            if (_originalSettings.TryGetValue("DisplayTitle", out var displayTitle))
+            {
+                DisplayTitle = MainWindowViewModel.NormalizeDisplayTitle(displayTitle);
+            }
+
             if (_originalSettings.TryGetValue("WeatherApiKey", out var apiKey))
             {
                 WeatherApiKey = apiKey;
@@ -454,7 +520,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             StartupEnabled = false;
             _settingsService.SetValue("Startup", "false");
-            _notificationService.ShowWarningMessage("开机自启未能创建计划任务，已恢复为关闭状态。");
+            _notificationService.ShowWarningMessage("开机自启设置失败，已恢复为关闭状态。");
         }
         else if (!desired && wasEnabled && _startupService.IsEnabled)
         {

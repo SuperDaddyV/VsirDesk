@@ -58,6 +58,15 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private double _panelWidth = 320;
 
     [ObservableProperty]
+    private double _panelHeight = 702;
+
+    [ObservableProperty]
+    private double _fontScale = 1.0;
+
+    [ObservableProperty]
+    private string _displayTitle = "UniDesk";
+
+    [ObservableProperty]
     private bool _isEditingShortcuts;
 
     [ObservableProperty]
@@ -236,6 +245,18 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         if (savedPanelWidth < IWindowService.MinPanelWidth) savedPanelWidth = IWindowService.MinPanelWidth;
         if (savedPanelWidth > IWindowService.MaxPanelWidth) savedPanelWidth = IWindowService.MaxPanelWidth;
         PanelWidth = savedPanelWidth;
+
+        var savedPanelHeight = _settingsService.GetSetting("PanelHeight", 702.0);
+        if (savedPanelHeight < IWindowService.MinPanelHeight) savedPanelHeight = IWindowService.MinPanelHeight;
+        if (savedPanelHeight > IWindowService.MaxPanelHeight) savedPanelHeight = IWindowService.MaxPanelHeight;
+        PanelHeight = savedPanelHeight;
+
+        var savedFontScale = _settingsService.GetSetting("FontScale", 1.0);
+        if (savedFontScale < 0.9) savedFontScale = 0.9;
+        if (savedFontScale > 1.18) savedFontScale = 1.18;
+        FontScale = savedFontScale;
+
+        DisplayTitle = NormalizeDisplayTitle(_settingsService.GetValue("DisplayTitle", "UniDesk"));
     }
 
     public void UpdatePanelWidth(double width)
@@ -245,6 +266,38 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         PanelWidth = width;
         _settingsService.SetValue("PanelWidth", width.ToString(CultureInfo.InvariantCulture));
         _windowService.SetWidth(width);
+    }
+
+    public void UpdatePanelHeight(double height)
+    {
+        if (height < IWindowService.MinPanelHeight) height = IWindowService.MinPanelHeight;
+        if (height > IWindowService.MaxPanelHeight) height = IWindowService.MaxPanelHeight;
+        PanelHeight = height;
+        _settingsService.SetValue("PanelHeight", height.ToString(CultureInfo.InvariantCulture));
+        if (!IsPanelCollapsed)
+        {
+            _windowService.SetHeight(height);
+        }
+    }
+
+    public void UpdateFontScale(double scale)
+    {
+        if (scale < 0.9) scale = 0.9;
+        if (scale > 1.18) scale = 1.18;
+        FontScale = scale;
+        _settingsService.SetValue("FontScale", scale.ToString(CultureInfo.InvariantCulture));
+    }
+
+    public void UpdateDisplayTitle(string? title)
+    {
+        DisplayTitle = NormalizeDisplayTitle(title);
+        _settingsService.SetValue("DisplayTitle", DisplayTitle);
+    }
+
+    public static string NormalizeDisplayTitle(string? title)
+    {
+        var normalized = string.IsNullOrWhiteSpace(title) ? "UniDesk" : title.Trim();
+        return normalized.Length > 20 ? normalized[..20] : normalized;
     }
 
     private void ClockService_OnTimeChanged() => UpdateClockText();
@@ -525,6 +578,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         _windowService.SetTopMost(IsTopMost);
         _windowService.SetOpacity(WindowOpacity);
         _windowService.SetWidth(PanelWidth);
+        if (!IsPanelCollapsed)
+        {
+            _windowService.SetHeight(PanelHeight);
+        }
     }
 
     public async Task ReloadShortcutsAsync() => await LoadShortcutsAsync();

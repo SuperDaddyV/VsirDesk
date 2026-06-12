@@ -8,9 +8,9 @@
         xmlns:models="clr-namespace:UniDesk.Models"
         xmlns:controls="clr-namespace:UniDesk.Controls"
         mc:Ignorable="d"
-        Title="UniDesk"
-        Height="702" Width="{Binding PanelWidth, Mode=TwoWay}"
-        MinHeight="702" MaxHeight="702" MinWidth="320" MaxWidth="520"
+        Title="{Binding DisplayTitle}"
+        Height="{Binding PanelHeight}" Width="{Binding PanelWidth, Mode=TwoWay}"
+        MinHeight="560" MaxHeight="920" MinWidth="320" MaxWidth="520"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -28,6 +28,7 @@
         <helpers:BundledIconPathConverter x:Key="BundledIconPathConverter"/>
         <helpers:TodoPriorityToBrushConverter x:Key="TodoPriorityBrush"/>
         <helpers:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+        <helpers:ScaledFontSizeConverter x:Key="ScaledFontSizeConverter"/>
         <Style x:Key="ModuleTitleIconBorderStyle" TargetType="Border">
             <Setter Property="BorderBrush" Value="{DynamicResource PrimaryTextBrush}"/>
             <Setter Property="Opacity" Value="0.9"/>
@@ -60,8 +61,8 @@
                         Padding="18,5,16,3"
                         MouseLeftButtonDown="TitleBar_OnMouseLeftButtonDown">
                     <Grid>
-                        <TextBlock Text="UniDesk"
-                                   FontSize="18"
+                        <TextBlock Text="{Binding DisplayTitle}"
+                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=18}"
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource PrimaryTextBrush}"
                                    VerticalAlignment="Center"/>
@@ -198,7 +199,7 @@
                                                    Foreground="{DynamicResource PrimaryTextBrush}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
-                                                    <Setter Property="FontSize" Value="43"/>
+                                                    <Setter Property="FontSize" Value="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=43}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsPanelCollapsed}" Value="True">
                                                             <Setter Property="FontSize" Value="30"/>
@@ -210,7 +211,7 @@
                                         <TextBlock Text="{Binding ClockDateText}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
-                                                    <Setter Property="FontSize" Value="11"/>
+                                                    <Setter Property="FontSize" Value="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=11}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsPanelCollapsed}" Value="True">
                                                             <Setter Property="FontSize" Value="10"/>
@@ -224,7 +225,7 @@
                                                    Visibility="{Binding ClockLunarText, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
-                                                    <Setter Property="FontSize" Value="11"/>
+                                                    <Setter Property="FontSize" Value="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=11}"/>
                                                     <Setter Property="Margin" Value="0,5,0,0"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsPanelCollapsed}" Value="True">
@@ -314,7 +315,7 @@
                                                        HorizontalAlignment="Right">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
-                                                        <Setter Property="FontSize" Value="24"/>
+                                                        <Setter Property="FontSize" Value="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=24}"/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsPanelCollapsed}" Value="True">
                                                                 <Setter Property="FontSize" Value="18"/>
@@ -327,7 +328,7 @@
                                                        HorizontalAlignment="Right">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
-                                                        <Setter Property="FontSize" Value="12"/>
+                                                        <Setter Property="FontSize" Value="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=12}"/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsPanelCollapsed}" Value="True">
                                                                 <Setter Property="FontSize" Value="10"/>
@@ -345,7 +346,7 @@
                                                TextWrapping="Wrap">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
-                                                <Setter Property="FontSize" Value="11"/>
+                                                <Setter Property="FontSize" Value="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=11}"/>
                                                 <Setter Property="Margin" Value="0,6,0,0"/>
                                                 <Setter Property="Visibility" Value="Visible"/>
                                                 <Style.Triggers>
@@ -382,7 +383,7 @@
                                                    TextAlignment="Right">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
-                                                    <Setter Property="FontSize" Value="11"/>
+                                                    <Setter Property="FontSize" Value="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=11}"/>
                                                     <Setter Property="MaxWidth" Value="70"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsPanelCollapsed}" Value="True">
@@ -405,7 +406,7 @@
                                                    Visibility="{Binding WeatherRangeLine, Converter={StaticResource StringNotEmptyToVisibilityConverter}}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
-                                                    <Setter Property="FontSize" Value="11"/>
+                                                    <Setter Property="FontSize" Value="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=11}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsPanelCollapsed}" Value="True">
                                                             <Setter Property="FontSize" Value="9"/>
@@ -639,7 +640,7 @@
                                     </Grid>
                                     <TextBlock Text="硬件监视"
                                                Style="{StaticResource ModuleHeaderTextStyle}"
-                                               FontSize="12"/>
+                                               FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=12}"/>
                                 </StackPanel>
 
                                 <Grid Grid.Row="1" Margin="0,8,0,0">
@@ -654,14 +655,14 @@
                                                 VerticalAlignment="Top"
                                                 HorizontalAlignment="Center">
                                         <TextBlock Text="{Binding SystemCpuUsageText}"
-                                                   FontSize="13"
+                                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=13}"
                                                    FontWeight="SemiBold"
                                                    LineHeight="16"
                                                    TextAlignment="Center"
                                                    HorizontalAlignment="Center"
                                                    Foreground="{DynamicResource PrimaryTextBrush}"/>
                                         <TextBlock Text="{Binding SystemCpuTemperatureText}"
-                                                   FontSize="10"
+                                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
                                                    LineHeight="12"
                                                    Margin="0,2,0,0"
                                                    TextAlignment="Center"
@@ -674,14 +675,14 @@
                                                 VerticalAlignment="Top"
                                                 HorizontalAlignment="Center">
                                         <TextBlock Text="{Binding SystemMemoryUsageText}"
-                                                   FontSize="13"
+                                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=13}"
                                                    FontWeight="SemiBold"
                                                    LineHeight="16"
                                                    TextAlignment="Center"
                                                    HorizontalAlignment="Center"
                                                    Foreground="{DynamicResource PrimaryTextBrush}"/>
                                         <TextBlock Text="MEM"
-                                                   FontSize="10"
+                                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
                                                    LineHeight="12"
                                                    Margin="0,2,0,0"
                                                    TextAlignment="Center"
@@ -694,14 +695,14 @@
                                                 VerticalAlignment="Top"
                                                 HorizontalAlignment="Center">
                                         <TextBlock Text="{Binding SystemGpuUsageText}"
-                                                   FontSize="13"
+                                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=13}"
                                                    FontWeight="SemiBold"
                                                    LineHeight="16"
                                                    TextAlignment="Center"
                                                    HorizontalAlignment="Center"
                                                    Foreground="{DynamicResource PrimaryTextBrush}"/>
                                         <TextBlock Text="{Binding SystemGpuTemperatureText}"
-                                                   FontSize="10"
+                                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
                                                    LineHeight="12"
                                                    Margin="0,2,0,0"
                                                    TextAlignment="Center"
@@ -726,12 +727,12 @@
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="接收RX"
-                                                       FontSize="10"
+                                                       FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
                                                        FontWeight="SemiBold"
                                                        LineHeight="12"
                                                        Foreground="{DynamicResource SecondaryTextBrush}"/>
                                             <TextBlock Text="{Binding SystemNetworkReceivedText}"
-                                                       FontSize="10.5"
+                                                       FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10.5}"
                                                        FontWeight="SemiBold"
                                                        LineHeight="12"
                                                        Margin="6,0,0,0"
@@ -743,12 +744,12 @@
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center">
                                             <TextBlock Text="发送TX"
-                                                       FontSize="10"
+                                                       FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
                                                        FontWeight="SemiBold"
                                                        LineHeight="12"
                                                        Foreground="{DynamicResource SecondaryTextBrush}"/>
                                             <TextBlock Text="{Binding SystemNetworkSentText}"
-                                                       FontSize="10.5"
+                                                       FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10.5}"
                                                        FontWeight="SemiBold"
                                                        LineHeight="12"
                                                        Margin="6,0,0,0"
@@ -778,7 +779,7 @@
                                             <Border Width="7" Height="7" CornerRadius="1.5" Style="{StaticResource ModuleTitleIconFillStyle}"/>
                                             <Border Width="7" Height="7" CornerRadius="1.5" Style="{StaticResource ModuleTitleIconFillStyle}"/>
                                         </UniformGrid>
-                                        <TextBlock Text="快捷方式" Style="{StaticResource ModuleHeaderTextStyle}" FontSize="12"/>
+                                        <TextBlock Text="快捷方式" Style="{StaticResource ModuleHeaderTextStyle}" FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=12}"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                         <Button FontSize="10"
@@ -884,7 +885,7 @@
                                                         </Border>
                                                     </Button>
                                                     <TextBlock Text="{Binding Name}"
-                                                               FontSize="10"
+                                                               FontSize="{Binding DataContext.FontScale, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
                                                                Foreground="{DynamicResource PrimaryTextBrush}"
                                                                TextTrimming="CharacterEllipsis"
                                                                VerticalAlignment="Center"
@@ -1073,7 +1074,7 @@
                                                       StrokeLineJoin="Round"/>
                                             </Canvas>
                                         </Viewbox>
-                                        <TextBlock Text="待办事项" Style="{StaticResource ModuleHeaderTextStyle}" FontSize="13"/>
+                                        <TextBlock Text="待办事项" Style="{StaticResource ModuleHeaderTextStyle}" FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=13}"/>
                                     </StackPanel>
                                     <Button Style="{StaticResource GhostButtonStyle}"
                                             HorizontalAlignment="Right"
@@ -1141,11 +1142,11 @@
                                                     <Grid Grid.Column="2" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding Title}"
                                                                    VerticalAlignment="Center"
-                                                                   FontSize="11"
+                                                                   FontSize="{Binding DataContext.FontScale, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=11}"
                                                                    TextTrimming="CharacterEllipsis">
                                                             <TextBlock.Style>
                                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource BodyTextStyle}">
-                                                                    <Setter Property="FontSize" Value="11"/>
+                                                                    <Setter Property="FontSize" Value="{Binding DataContext.FontScale, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=11}"/>
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding IsCompleted}" Value="True">
                                                                             <Setter Property="Foreground" Value="#D5CCEA"/>
@@ -1165,7 +1166,7 @@
                                                     </Grid>
                                                     <TextBlock Grid.Column="3"
                                                                VerticalAlignment="Center"
-                                                               FontSize="11"
+                                                               FontSize="{Binding DataContext.FontScale, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=11}"
                                                                Margin="8,0,4,0">
                                                         <TextBlock.Text>
                                                             <Binding Path="." Converter="{StaticResource TodoDueTextConverter}"/>

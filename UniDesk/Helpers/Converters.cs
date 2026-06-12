@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
@@ -56,4 +57,33 @@ public class InverseBooleanToVisibilityConverter : IValueConverter
         }
         return true;
     }
+}
+
+public class ScaledFontSizeConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var scale = value switch
+        {
+            double doubleValue => doubleValue,
+            float floatValue => floatValue,
+            decimal decimalValue => (double)decimalValue,
+            int intValue => intValue,
+            string text when double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => 1.0
+        };
+
+        var baseSize = 12.0;
+        if (parameter is string parameterText &&
+            double.TryParse(parameterText, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsedBaseSize))
+        {
+            baseSize = parsedBaseSize;
+        }
+
+        scale = Math.Clamp(scale, 0.9, 1.18);
+        return Math.Round(baseSize * scale, 1);
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        Binding.DoNothing;
 }

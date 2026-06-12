@@ -21,7 +21,7 @@ public partial class MainWindow : Window
     private bool _scrollPanPending;
     private bool _scrollPanActive;
     private bool _suppressPositionSave;
-    private const double ExpandedPanelHeight = 702;
+    private const double DefaultExpandedPanelHeight = 702;
     private const double CollapsedPanelHeight = 196;
     private const double WindowCornerRadius = 16;
 
@@ -48,13 +48,19 @@ public partial class MainWindow : Window
         {
             ApplyPanelCollapseState();
         }
+        else if (e.PropertyName == nameof(MainWindowViewModel.PanelHeight) && !_viewModel.IsPanelCollapsed)
+        {
+            ApplyPanelCollapseState();
+        }
     }
 
     private void ApplyPanelCollapseState()
     {
-        var targetHeight = _viewModel.IsPanelCollapsed ? CollapsedPanelHeight : ExpandedPanelHeight;
-        MinHeight = targetHeight;
-        MaxHeight = targetHeight;
+        var targetHeight = _viewModel.IsPanelCollapsed
+            ? CollapsedPanelHeight
+            : Math.Clamp(_viewModel.PanelHeight, IWindowService.MinPanelHeight, IWindowService.MaxPanelHeight);
+        MinHeight = _viewModel.IsPanelCollapsed ? CollapsedPanelHeight : IWindowService.MinPanelHeight;
+        MaxHeight = _viewModel.IsPanelCollapsed ? CollapsedPanelHeight : IWindowService.MaxPanelHeight;
         Height = targetHeight;
         ClampToVisibleWorkArea();
         if (MainModulesGrid.RowDefinitions.Count < 4)
@@ -90,7 +96,11 @@ public partial class MainWindow : Window
         _suppressPositionSave = true;
         try
         {
-            Height = _viewModel.IsPanelCollapsed ? CollapsedPanelHeight : ExpandedPanelHeight;
+            Height = _viewModel.IsPanelCollapsed
+                ? CollapsedPanelHeight
+                : Math.Clamp(_viewModel.PanelHeight <= 0 ? DefaultExpandedPanelHeight : _viewModel.PanelHeight,
+                    IWindowService.MinPanelHeight,
+                    IWindowService.MaxPanelHeight);
             Width = _viewModel.PanelWidth;
             ApplyPanelCollapseState();
 

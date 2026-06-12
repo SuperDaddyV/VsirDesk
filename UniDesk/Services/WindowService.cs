@@ -53,6 +53,12 @@ public class WindowService : IWindowService
         _mainWindow.Width = ClampPanelWidth(width);
     }
 
+    public void SetHeight(double height)
+    {
+        if (_mainWindow == null) return;
+        _mainWindow.Height = ClampPanelHeight(height);
+    }
+
     public void AnimateWidth(double width, Action? onCompleted = null)
     {
         if (_mainWindow == null)
@@ -114,5 +120,12 @@ public class WindowService : IWindowService
         if (width < IWindowService.MinPanelWidth) return IWindowService.MinPanelWidth;
         if (width > IWindowService.MaxPanelWidth) return IWindowService.MaxPanelWidth;
         return width;
+    }
+
+    private static double ClampPanelHeight(double height)
+    {
+        if (height < IWindowService.MinPanelHeight) return IWindowService.MinPanelHeight;
+        if (height > IWindowService.MaxPanelHeight) return IWindowService.MaxPanelHeight;
+        return height;
     }
 }

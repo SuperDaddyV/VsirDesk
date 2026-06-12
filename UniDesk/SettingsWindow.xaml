@@ -274,6 +274,15 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                    <TextBlock Text="标题名称"
+                               Style="{StaticResource DlgLabel}"
+                               Margin="0,0,0,6"
+                               VerticalAlignment="Top"/>
+                    <TextBox Style="{StaticResource DlgInlineTextBox}"
+                             Text="{Binding DisplayTitle, UpdateSourceTrigger=PropertyChanged}"
+                             MaxLength="20"
+                             Margin="0,0,0,10"/>
+
                     <Grid Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -307,6 +316,40 @@
                             Minimum="320" Maximum="520"
                             Value="{Binding PanelWidth, Mode=TwoWay}"
                             TickFrequency="20"/>
+
+                    <Grid Margin="0,10,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="52"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="面板高度" Style="{StaticResource DlgLabel}" Margin="0"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding PanelHeight, StringFormat={}{0:F0}px}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DlgTextSecondary}"
+                                   HorizontalAlignment="Right"/>
+                    </Grid>
+                    <Slider Style="{StaticResource DlgSlider}"
+                            Minimum="560" Maximum="920"
+                            Value="{Binding PanelHeight, Mode=TwoWay}"
+                            TickFrequency="20"/>
+
+                    <Grid Margin="0,10,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="52"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="字体大小" Style="{StaticResource DlgLabel}" Margin="0"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding FontScaleLabel}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DlgTextSecondary}"
+                                   HorizontalAlignment="Right"/>
+                    </Grid>
+                    <Slider Style="{StaticResource DlgSlider}"
+                            Minimum="0.9" Maximum="1.15"
+                            Value="{Binding FontScale, Mode=TwoWay}"
+                            TickFrequency="0.125"/>
 
                     <TextBlock Text="快捷方式数量"
                                Style="{StaticResource DlgLabel}"
