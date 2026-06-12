@@ -8,9 +8,23 @@ public class StartupService : IStartupService
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RegistryValueName = "UniDesk";
-    private const string LegacyRegistryValueName = "LumiDesk";
-    private const string ScheduledTaskName = @"\UniDesk";
-    private const string LegacyScheduledTaskName = @"\LumiDesk";
+
+    private static readonly string[] RegistryValueNames = new[]
+    {
+        "UniDesk",
+        "LumiDesk",
+        "VsirDesk"
+    };
+
+    private static readonly string[] ScheduledTaskNames = new[]
+    {
+        @"\UniDesk",
+        "UniDesk",
+        @"\LumiDesk",
+        "LumiDesk",
+        @"\VsirDesk",
+        "VsirDesk"
+    };
 
     private readonly INotificationService _notificationService;
 
@@ -19,10 +33,7 @@ public class StartupService : IStartupService
         _notificationService = notificationService;
     }
 
-    public bool IsEnabled => IsRegisteredInTaskScheduler(ScheduledTaskName)
-                             || IsRegisteredInRunKey(RegistryValueName)
-                             || IsRegisteredInTaskScheduler(LegacyScheduledTaskName)
-                             || IsRegisteredInRunKey(LegacyRegistryValueName);
+    public bool IsEnabled => HasCurrentStartupEntry() || HasLegacyStartupEntry();
 
     public bool Enable()
     {
@@ -35,15 +46,13 @@ public class StartupService : IStartupService
                 return false;
             }
 
-            if (!CreateScheduledTask(exePath))
+            if (!SetRunKeyValue(exePath))
             {
-                _notificationService.ShowErrorMessage("无法创建计划任务，开机自启设置失败。");
+                _notificationService.ShowErrorMessage("无法写入开机自启设置，开机自启设置失败。");
                 return false;
             }
 
-            DeleteScheduledTask(LegacyScheduledTaskName);
-            DeleteRunKeyValue(RegistryValueName);
-            DeleteRunKeyValue(LegacyRegistryValueName);
+            DeleteLegacyStartupEntries();
             return true;
         }
         catch (Exception ex)
@@ -57,11 +66,18 @@ public class StartupService : IStartupService
     {
         try
         {
-            var removedTask = DeleteScheduledTask(ScheduledTaskName);
-            var removedLegacyTask = DeleteScheduledTask(LegacyScheduledTaskName);
-            var removedRunKey = DeleteRunKeyValue(RegistryValueName);
-            var removedLegacyRunKey = DeleteRunKeyValue(LegacyRegistryValueName);
-            return removedTask || removedLegacyTask || removedRunKey || removedLegacyRunKey || !IsEnabled;
+            var removed = false;
+            foreach (var valueName in RegistryValueNames)
+            {
+                removed |= DeleteRunKeyValue(valueName);
+            }
+
+            foreach (var taskName in ScheduledTaskNames)
+            {
+                removed |= DeleteScheduledTask(taskName);
+            }
+
+            return removed || !IsEnabled;
         }
         catch (Exception ex)
         {
@@ -74,7 +90,7 @@ public class StartupService : IStartupService
     {
         if (shouldEnable)
         {
-            if (!IsRegisteredInTaskScheduler(ScheduledTaskName) || IsRegisteredInTaskScheduler(LegacyScheduledTaskName) || IsRegisteredInRunKey(LegacyRegistryValueName))
+            if (!HasCurrentStartupEntry() || HasLegacyStartupEntry())
             {
                 Enable();
             }
@@ -82,6 +98,58 @@ public class StartupService : IStartupService
         else if (IsEnabled)
         {
             Disable();
+        }
+    }
+
+    private static bool HasCurrentStartupEntry()
+    {
+        return IsRegisteredInRunKey(RegistryValueName)
+               || IsRegisteredInTaskScheduler(@"\UniDesk")
+               || IsRegisteredInTaskScheduler("UniDesk");
+    }
+
+    private static bool HasLegacyStartupEntry()
+    {
+        return IsRegisteredInRunKey("LumiDesk")
+               || IsRegisteredInRunKey("VsirDesk")
+               || IsRegisteredInTaskScheduler(@"\LumiDesk")
+               || IsRegisteredInTaskScheduler("LumiDesk")
+               || IsRegisteredInTaskScheduler(@"\VsirDesk")
+               || IsRegisteredInTaskScheduler("VsirDesk");
+    }
+
+    private static bool SetRunKeyValue(string exePath)
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return false;
+            }
+
+            using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath, writable: true);
+            if (key == null)
+            {
+                return false;
+            }
+
+            key.SetValue(RegistryValueName, $"\"{exePath}\"");
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void DeleteLegacyStartupEntries()
+    {
+        DeleteRunKeyValue("LumiDesk");
+        DeleteRunKeyValue("VsirDesk");
+
+        foreach (var taskName in ScheduledTaskNames)
+        {
+            DeleteScheduledTask(taskName);
         }
     }
 
@@ -114,27 +182,25 @@ public class StartupService : IStartupService
         return result.ExitCode == 0;
     }
 
-    private static bool CreateScheduledTask(string exePath)
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            return false;
-        }
-
-        var taskRun = $"\\\"{exePath}\\\"";
-        var args = $"/Create /TN \"{ScheduledTaskName}\" /SC ONLOGON /TR \"{taskRun}\" /RL LIMITED /F";
-        return RunSchtasks(args).ExitCode == 0;
-    }
-
     private static bool DeleteScheduledTask(string taskName)
     {
-        if (!OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsWindows() || !IsRegisteredInTaskScheduler(taskName))
         {
             return false;
         }
 
         var result = RunSchtasks($"/Delete /TN \"{taskName}\" /F");
-        return result.ExitCode == 0;
+        if (result.ExitCode == 0 || !IsRegisteredInTaskScheduler(taskName))
+        {
+            return true;
+        }
+
+        if (DeleteScheduledTaskWithPowerShell(taskName) || !IsRegisteredInTaskScheduler(taskName))
+        {
+            return true;
+        }
+
+        return DeleteScheduledTaskElevated(taskName) || !IsRegisteredInTaskScheduler(taskName);
     }
 
     private static bool DeleteRunKeyValue(string valueName)
@@ -159,6 +225,75 @@ public class StartupService : IStartupService
         {
             return false;
         }
+    }
+
+    private static bool DeleteScheduledTaskWithPowerShell(string taskName)
+    {
+        var taskLeafName = EscapePowerShellSingleQuoted(GetScheduledTaskLeafName(taskName));
+        var taskPath = EscapePowerShellSingleQuoted(GetScheduledTaskPath(taskName));
+        var command = $"Unregister-ScheduledTask -TaskPath '{taskPath}' -TaskName '{taskLeafName}' -Confirm:$false -ErrorAction Stop";
+        return RunPowerShell(command).ExitCode == 0;
+    }
+
+    private static bool DeleteScheduledTaskElevated(string taskName)
+    {
+        try
+        {
+            var schtasksPath = Path.Combine(Environment.SystemDirectory, "schtasks.exe");
+            if (!File.Exists(schtasksPath))
+            {
+                schtasksPath = "schtasks.exe";
+            }
+
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = schtasksPath,
+                Arguments = $"/Delete /TN \"{taskName}\" /F",
+                UseShellExecute = true,
+                Verb = "runas",
+                WindowStyle = ProcessWindowStyle.Hidden
+            });
+
+            if (process == null)
+            {
+                return false;
+            }
+
+            if (!process.WaitForExit(10000))
+            {
+                return false;
+            }
+
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string GetScheduledTaskLeafName(string taskName)
+    {
+        var normalized = taskName.Replace('/', '\\').TrimEnd('\\');
+        var separatorIndex = normalized.LastIndexOf('\\');
+        return separatorIndex >= 0 ? normalized[(separatorIndex + 1)..] : normalized;
+    }
+
+    private static string GetScheduledTaskPath(string taskName)
+    {
+        var normalized = taskName.Replace('/', '\\');
+        var separatorIndex = normalized.LastIndexOf('\\');
+        if (separatorIndex <= 0)
+        {
+            return @"\";
+        }
+
+        return normalized[..(separatorIndex + 1)];
+    }
+
+    private static string EscapePowerShellSingleQuoted(string value)
+    {
+        return value.Replace("'", "''");
     }
 
     private static (int ExitCode, string Output) RunSchtasks(string arguments)
@@ -187,7 +322,46 @@ public class StartupService : IStartupService
             }
 
             var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
-            process.WaitForExit(5000);
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(entireProcessTree: true);
+                return (-1, output);
+            }
+
+            return (process.ExitCode, output);
+        }
+        catch (Exception ex)
+        {
+            return (-1, ex.Message);
+        }
+    }
+
+    private static (int ExitCode, string Output) RunPowerShell(string command)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{command}\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            });
+
+            if (process == null)
+            {
+                return (-1, string.Empty);
+            }
+
+            var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+            if (!process.WaitForExit(5000))
+            {
+                process.Kill(entireProcessTree: true);
+                return (-1, output);
+            }
+
             return (process.ExitCode, output);
         }
         catch (Exception ex)

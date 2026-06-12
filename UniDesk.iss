@@ -5,7 +5,7 @@
 ;   dotnet publish UniDesk\UniDesk.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish\win-x64
 
 #define MyAppName "UniDesk"
-#define MyAppVersion "1.1.1"
+#define MyAppVersion "1.1.2"
 #define MyAppPublisher "UniDesk"
 #define MyAppURL "https://github.com/SuperDaddyV/UniDesk"
 #define MyAppExeName "UniDesk.exe"
@@ -69,9 +69,13 @@ Source: "UniDesk\secrets.json"; DestDir: "{app}"; Flags: ignoreversion skipifsou
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon\{#MyAppIconName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon\{#MyAppIconName}"; Tasks: desktopicon
 
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: startupicon
+
 [Run]
-Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN ""\{#MyAppName}"" /SC ONLOGON /TR ""\""{app}\{#MyAppExeName}\"""" /RL LIMITED /F"; Flags: runhidden; Tasks: startupicon
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\{#MyAppName}"" /F"; Flags: runhidden
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\LumiDesk"" /F"; Flags: runhidden
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\VsirDesk"" /F"; Flags: runhidden
