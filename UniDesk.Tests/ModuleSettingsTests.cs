@@ -15,7 +15,9 @@ public class ModuleSettingsTests
                 DashboardModuleIds.TimeWeather,
                 DashboardModuleIds.HardwareMonitor,
                 DashboardModuleIds.Shortcuts,
-                DashboardModuleIds.Todos
+                DashboardModuleIds.Todos,
+                DashboardModuleIds.QuickNotes,
+                DashboardModuleIds.QuickText
             ],
             modules.Select(module => module.ModuleId));
         Assert.All(modules, module => Assert.True(module.IsEnabled));
@@ -39,7 +41,9 @@ public class ModuleSettingsTests
         Assert.Contains(modules, module => module.ModuleId == DashboardModuleIds.HardwareMonitor);
         Assert.Contains(modules, module => module.ModuleId == DashboardModuleIds.Shortcuts);
         Assert.Contains(modules, module => module.ModuleId == DashboardModuleIds.Todos && !module.IsEnabled);
-        Assert.Equal([0, 1, 2, 3], modules.Select(module => module.SortOrder));
+        Assert.Contains(modules, module => module.ModuleId == DashboardModuleIds.QuickNotes);
+        Assert.Contains(modules, module => module.ModuleId == DashboardModuleIds.QuickText);
+        Assert.Equal([0, 1, 2, 3, 4, 5], modules.Select(module => module.SortOrder));
     }
 
     [Fact]

@@ -74,6 +74,43 @@ public class DatabaseServiceTests
     }
 
     [Fact]
+    public async Task InitializeAsync_ShouldCreateQuickNotesTable()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='QuickNotes'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, result);
+
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateQuickTextTables()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var clipboardHistory = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ClipboardHistory'",
+            reader => reader.GetInt32(0)
+        );
+        var snippets = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='TextSnippets'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, clipboardHistory);
+        Assert.Equal(1, snippets);
+
+        Cleanup();
+    }
+
+    [Fact]
     public async Task InitializeAsync_ShouldCreateShortcutsTable()
     {
         var databaseService = GetService();
@@ -144,6 +181,43 @@ public class DatabaseServiceTests
     }
 
     [Fact]
+    public async Task InitializeAsync_ShouldCreateQuickNotesIndex()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var result = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_quick_notes_order'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, result);
+
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateQuickTextIndexes()
+    {
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var clipboardIndex = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_clipboard_history_last_used'",
+            reader => reader.GetInt32(0)
+        );
+        var snippetIndex = await databaseService.QuerySingleAsync<int>(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_text_snippets_order'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Equal(1, clipboardIndex);
+        Assert.Equal(1, snippetIndex);
+
+        Cleanup();
+    }
+
+    [Fact]
     public async Task InitializeAsync_ShouldInitializeDefaultSettings()
     {
         var databaseService = GetService();
@@ -175,6 +249,9 @@ public class DatabaseServiceTests
             "AutoLocation",
             "City",
             "ColorScheme",
+            "ClipboardHistoryEnabled",
+            "ClipboardHistoryMaxCount",
+            "ClipboardSensitiveFilterEnabled",
             "DatabaseVersion",
             "DefaultWeatherApiHostEnc",
             "DefaultWeatherApiKeyEnc",
@@ -215,7 +292,7 @@ public class DatabaseServiceTests
             reader => reader.GetString(0)
         );
 
-        Assert.Equal("1.3", version);
+        Assert.Equal("1.5", version);
         
         Cleanup();
     }

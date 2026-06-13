@@ -211,6 +211,9 @@ public partial class App : Application
         services.AddSingleton<IWeatherService, WeatherService>();
         services.AddSingleton<IClockService, ClockService>();
         services.AddSingleton<INoteService, NoteService>();
+        services.AddSingleton<IQuickNoteService, QuickNoteService>();
+        services.AddSingleton<IQuickTextService, QuickTextService>();
+        services.AddSingleton<IClipboardMonitorService, ClipboardMonitorService>();
         services.AddSingleton<ITodoService, TodoService>();
         services.AddSingleton<ITodoBackupService, TodoBackupService>();
         services.AddSingleton<IShortcutService, ShortcutService>();

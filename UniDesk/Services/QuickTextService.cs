@@ -1,0 +1,409 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using Microsoft.Data.Sqlite;
+using UniDesk.Helpers;
+using UniDesk.Models;
+
+namespace UniDesk.Services;
+
+public partial class QuickTextService : IQuickTextService
+{
+    public const int MaxContentLength = 5000;
+    public static readonly int[] AllowedHistoryLimits = [20, 50, 100, 200];
+    public const int DefaultHistoryLimit = 50;
+
+    public const string HistoryEnabledSettingKey = "ClipboardHistoryEnabled";
+    public const string SensitiveFilterSettingKey = "ClipboardSensitiveFilterEnabled";
+    public const string HistoryMaxCountSettingKey = "ClipboardHistoryMaxCount";
+
+    private readonly IDatabaseService _databaseService;
+    private readonly ISettingsService _settingsService;
+
+    private const string HistoryColumns =
+        "Id, Content, ContentHash, CreatedAt, LastUsedAt, UseCount";
+
+    private const string SnippetColumns =
+        "Id, Title, Content, Category, IsPinned, SortOrder, UseCount, CreatedAt, UpdatedAt, LastUsedAt";
+
+    public QuickTextService(IDatabaseService databaseService, ISettingsService settingsService)
+    {
+        _databaseService = databaseService;
+        _settingsService = settingsService;
+    }
+
+    public async Task<List<ClipboardHistoryItem>> GetClipboardHistoryAsync(int? limit = null)
+    {
+        try
+        {
+            var take = Math.Max(1, limit ?? GetHistoryMaxCount());
+            return await _databaseService.QueryAsync(
+                $"SELECT {HistoryColumns} FROM ClipboardHistory ORDER BY LastUsedAt DESC LIMIT @p0",
+                MapHistory,
+                take);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "QuickTextService.GetClipboardHistoryAsync");
+            return [];
+        }
+    }
+
+    public async Task<List<TextSnippet>> GetTextSnippetsAsync()
+    {
+        try
+        {
+            var snippets = await _databaseService.QueryAsync(
+                $"SELECT {SnippetColumns} FROM TextSnippets",
+                MapSnippet);
+
+            return snippets
+                .OrderByDescending(snippet => snippet.IsPinned)
+                .ThenBy(snippet => snippet.SortOrder)
+                .ThenByDescending(snippet => snippet.LastUsedAt ?? snippet.UpdatedAt)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "QuickTextService.GetTextSnippetsAsync");
+            return [];
+        }
+    }
+
+    public async Task<bool> RecordClipboardTextAsync(string? text)
+    {
+        if (!_settingsService.GetSetting(HistoryEnabledSettingKey, true))
+        {
+            return false;
+        }
+
+        var normalized = NormalizeClipboardText(text);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        if (_settingsService.GetSetting(SensitiveFilterSettingKey, true) && IsSensitiveContent(normalized))
+        {
+            Logger.LogInfo("QuickTextService.RecordClipboardTextAsync: filtered sensitive clipboard text.");
+            return false;
+        }
+
+        var hash = ComputeHash(normalized);
+        var now = DateTime.UtcNow;
+
+        try
+        {
+            var latest = await _databaseService.QuerySingleAsync(
+                $"SELECT {HistoryColumns} FROM ClipboardHistory ORDER BY LastUsedAt DESC LIMIT 1",
+                MapHistory);
+
+            if (string.Equals(latest?.ContentHash, hash, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var existing = await _databaseService.QuerySingleAsync(
+                $"SELECT {HistoryColumns} FROM ClipboardHistory WHERE ContentHash = @p0",
+                MapHistory,
+                hash);
+
+            if (existing != null)
+            {
+                await _databaseService.ExecuteNonQueryAsync(
+                    "UPDATE ClipboardHistory SET LastUsedAt = @p0, UseCount = UseCount + 1 WHERE Id = @p1",
+                    now.ToString("o", CultureInfo.InvariantCulture),
+                    existing.Id);
+            }
+            else
+            {
+                await _databaseService.ExecuteNonQueryAsync(
+                    "INSERT INTO ClipboardHistory (Content, ContentHash, CreatedAt, LastUsedAt, UseCount) VALUES (@p0, @p1, @p2, @p3, @p4)",
+                    normalized,
+                    hash,
+                    now.ToString("o", CultureInfo.InvariantCulture),
+                    now.ToString("o", CultureInfo.InvariantCulture),
+                    1);
+            }
+
+            await TrimClipboardHistoryAsync(GetHistoryMaxCount());
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "QuickTextService.RecordClipboardTextAsync");
+            return false;
+        }
+    }
+
+    public async Task DeleteClipboardHistoryAsync(int id)
+    {
+        try
+        {
+            await _databaseService.ExecuteNonQueryAsync("DELETE FROM ClipboardHistory WHERE Id = @p0", id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"QuickTextService.DeleteClipboardHistoryAsync({id})");
+        }
+    }
+
+    public async Task ClearClipboardHistoryAsync()
+    {
+        try
+        {
+            await _databaseService.ExecuteNonQueryAsync("DELETE FROM ClipboardHistory");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "QuickTextService.ClearClipboardHistoryAsync");
+        }
+    }
+
+    public async Task TrimClipboardHistoryAsync(int maxCount)
+    {
+        try
+        {
+            var safeMax = NormalizeHistoryLimit(maxCount);
+            await _databaseService.ExecuteNonQueryAsync(
+                """
+                DELETE FROM ClipboardHistory
+                WHERE Id NOT IN (
+                    SELECT Id FROM ClipboardHistory
+                    ORDER BY LastUsedAt DESC
+                    LIMIT @p0
+                )
+                """,
+                safeMax);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "QuickTextService.TrimClipboardHistoryAsync");
+        }
+    }
+
+    public async Task<int> CreateTextSnippetAsync(TextSnippet snippet)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var createdAt = snippet.CreatedAt == default ? now : snippet.CreatedAt;
+            var updatedAt = snippet.UpdatedAt == default ? now : snippet.UpdatedAt;
+
+            return await _databaseService.QuerySingleAsync(
+                "INSERT INTO TextSnippets (Title, Content, Category, IsPinned, SortOrder, UseCount, CreatedAt, UpdatedAt, LastUsedAt) VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8) RETURNING Id",
+                reader => reader.GetInt32(0),
+                snippet.Title ?? string.Empty,
+                snippet.Content ?? string.Empty,
+                NormalizeCategory(snippet.Category),
+                snippet.IsPinned ? 1 : 0,
+                snippet.SortOrder,
+                Math.Max(0, snippet.UseCount),
+                createdAt.ToString("o", CultureInfo.InvariantCulture),
+                updatedAt.ToString("o", CultureInfo.InvariantCulture),
+                snippet.LastUsedAt?.ToString("o", CultureInfo.InvariantCulture));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "QuickTextService.CreateTextSnippetAsync");
+            return 0;
+        }
+    }
+
+    public async Task UpdateTextSnippetAsync(TextSnippet snippet)
+    {
+        try
+        {
+            var updatedAt = DateTime.UtcNow;
+            await _databaseService.ExecuteNonQueryAsync(
+                "UPDATE TextSnippets SET Title = @p0, Content = @p1, Category = @p2, IsPinned = @p3, SortOrder = @p4, UpdatedAt = @p5 WHERE Id = @p6",
+                snippet.Title ?? string.Empty,
+                snippet.Content ?? string.Empty,
+                NormalizeCategory(snippet.Category),
+                snippet.IsPinned ? 1 : 0,
+                snippet.SortOrder,
+                updatedAt.ToString("o", CultureInfo.InvariantCulture),
+                snippet.Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"QuickTextService.UpdateTextSnippetAsync({snippet.Id})");
+        }
+    }
+
+    public async Task DeleteTextSnippetAsync(int id)
+    {
+        try
+        {
+            await _databaseService.ExecuteNonQueryAsync("DELETE FROM TextSnippets WHERE Id = @p0", id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"QuickTextService.DeleteTextSnippetAsync({id})");
+        }
+    }
+
+    public async Task<TextSnippet?> CreateSnippetFromHistoryAsync(ClipboardHistoryItem? item)
+    {
+        if (item == null || string.IsNullOrWhiteSpace(item.Content))
+        {
+            return null;
+        }
+
+        var title = BuildTitle(item.Content);
+        var snippet = new TextSnippet
+        {
+            Title = title,
+            Content = item.Content,
+            Category = "默认",
+            SortOrder = 0,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        var id = await CreateTextSnippetAsync(snippet);
+        if (id <= 0)
+        {
+            return null;
+        }
+
+        snippet.Id = id;
+        return snippet;
+    }
+
+    public async Task MarkSnippetUsedAsync(int id)
+    {
+        try
+        {
+            await _databaseService.ExecuteNonQueryAsync(
+                "UPDATE TextSnippets SET UseCount = UseCount + 1, LastUsedAt = @p0 WHERE Id = @p1",
+                DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
+                id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"QuickTextService.MarkSnippetUsedAsync({id})");
+        }
+    }
+
+    public static int NormalizeHistoryLimit(int value) =>
+        AllowedHistoryLimits.Contains(value) ? value : DefaultHistoryLimit;
+
+    public static bool IsSensitiveContent(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var trimmed = text.Trim();
+        if (VerificationCodeRegex().IsMatch(trimmed) ||
+            ChinaIdRegex().IsMatch(trimmed) ||
+            BankCardRegex().IsMatch(trimmed) ||
+            JwtRegex().IsMatch(trimmed))
+        {
+            return true;
+        }
+
+        var lower = trimmed.ToLowerInvariant();
+        string[] keywords =
+        [
+            "password",
+            "passwd",
+            "token",
+            "api_key",
+            "apikey",
+            "secret",
+            "authorization",
+            "bearer",
+            "cookie",
+            "session"
+        ];
+
+        return keywords.Any(lower.Contains);
+    }
+
+    internal static string NormalizeClipboardText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var normalized = text.Trim();
+        return normalized.Length <= MaxContentLength
+            ? normalized
+            : normalized[..MaxContentLength];
+    }
+
+    internal static string ComputeHash(string text)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(text));
+        return Convert.ToHexString(bytes);
+    }
+
+    private int GetHistoryMaxCount() =>
+        NormalizeHistoryLimit(_settingsService.GetSetting(HistoryMaxCountSettingKey, DefaultHistoryLimit));
+
+    private static string BuildTitle(string content)
+    {
+        var title = ClipboardHistoryItem.BuildDisplayText(content);
+        return title.Length <= 40 ? title : title[..40];
+    }
+
+    private static string NormalizeCategory(string? category) =>
+        string.IsNullOrWhiteSpace(category) ? "默认" : category.Trim();
+
+    private static ClipboardHistoryItem MapHistory(SqliteDataReader reader) => new()
+    {
+        Id = reader.GetInt32(0),
+        Content = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+        ContentHash = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+        CreatedAt = ParseDateTime(reader.IsDBNull(3) ? null : reader.GetString(3)) ?? DateTime.UtcNow,
+        LastUsedAt = ParseDateTime(reader.IsDBNull(4) ? null : reader.GetString(4)) ?? DateTime.UtcNow,
+        UseCount = reader.IsDBNull(5) ? 0 : reader.GetInt32(5)
+    };
+
+    private static TextSnippet MapSnippet(SqliteDataReader reader) => new()
+    {
+        Id = reader.GetInt32(0),
+        Title = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+        Content = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+        Category = reader.IsDBNull(3) ? "默认" : reader.GetString(3),
+        IsPinned = !reader.IsDBNull(4) && reader.GetInt32(4) != 0,
+        SortOrder = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
+        UseCount = reader.IsDBNull(6) ? 0 : reader.GetInt32(6),
+        CreatedAt = ParseDateTime(reader.IsDBNull(7) ? null : reader.GetString(7)) ?? DateTime.UtcNow,
+        UpdatedAt = ParseDateTime(reader.IsDBNull(8) ? null : reader.GetString(8)) ?? DateTime.UtcNow,
+        LastUsedAt = ParseDateTime(reader.IsDBNull(9) ? null : reader.GetString(9))
+    };
+
+    private static DateTime? ParseDateTime(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return DateTime.TryParse(
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out var parsed)
+            ? parsed
+            : null;
+    }
+
+    [GeneratedRegex(@"^\d{4,8}$")]
+    private static partial Regex VerificationCodeRegex();
+
+    [GeneratedRegex(@"^\d{17}[\dXx]$")]
+    private static partial Regex ChinaIdRegex();
+
+    [GeneratedRegex(@"^\d{13,19}$")]
+    private static partial Regex BankCardRegex();
+
+    [GeneratedRegex(@"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$")]
+    private static partial Regex JwtRegex();
+}

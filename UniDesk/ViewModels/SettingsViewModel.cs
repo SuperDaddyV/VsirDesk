@@ -21,6 +21,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IWeatherService _weatherService;
     private readonly IStartupService _startupService;
     private readonly ITodoBackupService _todoBackupService;
+    private readonly IQuickTextService _quickTextService;
     private readonly MainWindowViewModel _mainWindowViewModel;
 
     private readonly Dictionary<string, string> _originalSettings = new();
@@ -59,6 +60,17 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private int _shortcutMaxCount = ShortcutLimitHelper.DefaultLimit;
 
+    [ObservableProperty]
+    private bool _clipboardHistoryEnabled = true;
+
+    [ObservableProperty]
+    private bool _clipboardSensitiveFilterEnabled = true;
+
+    [ObservableProperty]
+    private int _clipboardHistoryMaxCount = QuickTextService.DefaultHistoryLimit;
+
+    public IReadOnlyList<int> ClipboardHistoryLimitOptions => QuickTextService.AllowedHistoryLimits;
+
     public ObservableCollection<ModuleSettingOptionViewModel> ModuleSettings { get; } = new();
 
     private List<ModuleSetting> _originalModuleSettings = [];
@@ -88,6 +100,7 @@ public partial class SettingsViewModel : ObservableObject
         IWeatherService weatherService,
         IStartupService startupService,
         ITodoBackupService todoBackupService,
+        IQuickTextService quickTextService,
         MainWindowViewModel mainWindowViewModel)
     {
         _settingsService = settingsService;
@@ -97,6 +110,7 @@ public partial class SettingsViewModel : ObservableObject
         _weatherService = weatherService;
         _startupService = startupService;
         _todoBackupService = todoBackupService;
+        _quickTextService = quickTextService;
         _mainWindowViewModel = mainWindowViewModel;
 
         foreach (var scheme in AppColorSchemeCatalog.All)
@@ -125,6 +139,10 @@ public partial class SettingsViewModel : ObservableObject
             WeatherApiHost = _settingsService.GetValue("WeatherApiHost", "");
             ShortcutMaxCount = ShortcutLimitHelper.ParseLimit(
                 _settingsService.GetValue("ShortcutMaxCount", ShortcutLimitHelper.DefaultLimit.ToString()));
+            ClipboardHistoryEnabled = _settingsService.GetSetting(QuickTextService.HistoryEnabledSettingKey, true);
+            ClipboardSensitiveFilterEnabled = _settingsService.GetSetting(QuickTextService.SensitiveFilterSettingKey, true);
+            ClipboardHistoryMaxCount = QuickTextService.NormalizeHistoryLimit(
+                _settingsService.GetSetting(QuickTextService.HistoryMaxCountSettingKey, QuickTextService.DefaultHistoryLimit));
             LoadModuleSettings(_mainWindowViewModel.GetModuleSettingsSnapshot());
 
             PanelWidth = Math.Clamp(PanelWidth, IWindowService.MinPanelWidth, IWindowService.MaxPanelWidth);
@@ -153,6 +171,9 @@ public partial class SettingsViewModel : ObservableObject
         _originalSettings["WeatherApiKey"] = WeatherApiKey;
         _originalSettings["WeatherApiHost"] = WeatherApiHost;
         _originalSettings["ShortcutMaxCount"] = ShortcutMaxCount.ToString(CultureInfo.InvariantCulture);
+        _originalSettings["ClipboardHistoryEnabled"] = ClipboardHistoryEnabled.ToString();
+        _originalSettings["ClipboardSensitiveFilterEnabled"] = ClipboardSensitiveFilterEnabled.ToString();
+        _originalSettings["ClipboardHistoryMaxCount"] = ClipboardHistoryMaxCount.ToString(CultureInfo.InvariantCulture);
         _originalModuleSettings = ModuleSettings.Select(module => module.ToModel().Clone()).ToList();
     }
 
@@ -180,6 +201,30 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         ShortcutMaxCount = limit;
+    }
+
+    [RelayCommand]
+    private void SelectClipboardHistoryLimit(string? limitText)
+    {
+        if (!int.TryParse(limitText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var limit))
+        {
+            return;
+        }
+
+        ClipboardHistoryMaxCount = QuickTextService.NormalizeHistoryLimit(limit);
+    }
+
+    [RelayCommand]
+    private async Task ClearClipboardHistoryFromSettingsAsync()
+    {
+        if (!_notificationService.ShowConfirmDialog("确定清空全部剪贴板历史？", "确认清空"))
+        {
+            return;
+        }
+
+        await _quickTextService.ClearClipboardHistoryAsync();
+        await _mainWindowViewModel.ReloadQuickTextAsync();
+        _notificationService.ShowSuccessMessage("剪贴板历史已清空。");
     }
 
     [RelayCommand]
@@ -357,14 +402,19 @@ public partial class SettingsViewModel : ObservableObject
             _settingsService.SetValue("WeatherApiKey", apiKeyToValidate);
             _settingsService.SetValue("WeatherApiHost", apiHostToValidate);
             _settingsService.SetValue("ShortcutMaxCount", ShortcutMaxCount.ToString(CultureInfo.InvariantCulture));
+            _settingsService.SetValue(QuickTextService.HistoryEnabledSettingKey, ClipboardHistoryEnabled.ToString());
+            _settingsService.SetValue(QuickTextService.SensitiveFilterSettingKey, ClipboardSensitiveFilterEnabled.ToString());
+            _settingsService.SetValue(QuickTextService.HistoryMaxCountSettingKey, ClipboardHistoryMaxCount.ToString(CultureInfo.InvariantCulture));
             _mainWindowViewModel.ApplyModuleSettings(BuildModuleSettings(), persist: true);
 
             await _settingsService.FlushPendingSavesAsync();
+            await _quickTextService.TrimClipboardHistoryAsync(ClipboardHistoryMaxCount);
 
             AppColorSchemeCatalog.Apply(SelectedColorScheme);
             ApplyWindowPreview();
             _mainWindowViewModel.SetShortcutLimitPreview(null);
             await _mainWindowViewModel.ReloadShortcutsAsync();
+            await _mainWindowViewModel.ReloadQuickTextAsync();
             ApplyStartupSetting();
             SaveOriginalSettings();
 
@@ -442,6 +492,9 @@ public partial class SettingsViewModel : ObservableObject
         WeatherApiHost = "";
         IsEditingWeatherApi = false;
         ShortcutMaxCount = ShortcutLimitHelper.DefaultLimit;
+        ClipboardHistoryEnabled = true;
+        ClipboardSensitiveFilterEnabled = true;
+        ClipboardHistoryMaxCount = QuickTextService.DefaultHistoryLimit;
         LoadModuleSettings(DashboardModuleCatalog.CreateDefaultModules());
         ApplyModulePreview();
 
@@ -453,9 +506,9 @@ public partial class SettingsViewModel : ObservableObject
     {
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "备份待办事项",
+            Title = "备份 UniDesk 数据",
             Filter = "JSON 文件 (*.json)|*.json",
-            FileName = $"UniDesk-todos-{DateTime.Now:yyyyMMdd-HHmm}.json",
+            FileName = $"UniDesk-data-{DateTime.Now:yyyyMMdd-HHmm}.json",
             DefaultExt = ".json"
         };
 
@@ -467,7 +520,7 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             await _todoBackupService.ExportToFileAsync(dialog.FileName);
-            _notificationService.ShowSuccessMessage("待办事项已备份。");
+            _notificationService.ShowSuccessMessage("UniDesk 数据已备份。");
         }
         catch (Exception ex)
         {
@@ -479,7 +532,7 @@ public partial class SettingsViewModel : ObservableObject
     private async Task RestoreTodosAsync()
     {
         var confirmed = _notificationService.ShowConfirmDialog(
-            "还原将覆盖当前所有待办事项，是否继续？",
+            "还原将覆盖备份文件中包含的待办事项、快速便签和快捷文本，是否继续？",
             "确认还原");
         if (!confirmed)
         {
@@ -488,7 +541,7 @@ public partial class SettingsViewModel : ObservableObject
 
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "还原待办事项",
+            Title = "还原 UniDesk 数据",
             Filter = "JSON 文件 (*.json)|*.json"
         };
 
@@ -499,9 +552,12 @@ public partial class SettingsViewModel : ObservableObject
 
         try
         {
-            var count = await _todoBackupService.ImportFromFileAsync(dialog.FileName);
+            var result = await _todoBackupService.ImportFromFileAsync(dialog.FileName);
             await _mainWindowViewModel.ReloadTodosAsync();
-            _notificationService.ShowSuccessMessage($"已还原 {count} 条待办事项。");
+            await _mainWindowViewModel.ReloadQuickNotesAsync();
+            await _mainWindowViewModel.ReloadQuickTextAsync();
+            _notificationService.ShowSuccessMessage(
+                $"已还原 {result.TodoCount} 条待办事项，{result.QuickNoteCount} 条便签，{result.ClipboardHistoryCount} 条历史，{result.TextSnippetCount} 条常用短语。");
         }
         catch (Exception ex)
         {
@@ -592,6 +648,22 @@ public partial class SettingsViewModel : ObservableObject
             if (_originalSettings.TryGetValue("ShortcutMaxCount", out var shortcutMaxCount))
             {
                 ShortcutMaxCount = ShortcutLimitHelper.ParseLimit(shortcutMaxCount);
+            }
+
+            if (_originalSettings.TryGetValue("ClipboardHistoryEnabled", out var clipboardHistoryEnabled))
+            {
+                ClipboardHistoryEnabled = bool.Parse(clipboardHistoryEnabled);
+            }
+
+            if (_originalSettings.TryGetValue("ClipboardSensitiveFilterEnabled", out var clipboardSensitiveFilterEnabled))
+            {
+                ClipboardSensitiveFilterEnabled = bool.Parse(clipboardSensitiveFilterEnabled);
+            }
+
+            if (_originalSettings.TryGetValue("ClipboardHistoryMaxCount", out var clipboardHistoryMaxCount))
+            {
+                ClipboardHistoryMaxCount = QuickTextService.NormalizeHistoryLimit(
+                    int.Parse(clipboardHistoryMaxCount, CultureInfo.InvariantCulture));
             }
 
             LoadModuleSettings(_originalModuleSettings);

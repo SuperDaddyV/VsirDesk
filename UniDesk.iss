@@ -5,7 +5,7 @@
 ;   dotnet publish UniDesk\UniDesk.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish\win-x64
 
 #define MyAppName "UniDesk"
-#define MyAppVersion "1.2.0"
+#define MyAppVersion "1.3.0"
 #define MyAppPublisher "UniDesk"
 #define MyAppURL "https://github.com/SuperDaddyV/UniDesk"
 #define MyAppExeName "UniDesk.exe"
@@ -76,6 +76,6 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\{#MyAppName}"" /F"; Flags: runhidden
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\LumiDesk"" /F"; Flags: runhidden
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\VsirDesk"" /F"; Flags: runhidden
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\{#MyAppName}"" /F"; Flags: runhidden; RunOnceId: "DeleteUniDeskTask"
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\LumiDesk"" /F"; Flags: runhidden; RunOnceId: "DeleteLegacyLumiDeskTask"
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""\VsirDesk"" /F"; Flags: runhidden; RunOnceId: "DeleteLegacyVsirDeskTask"

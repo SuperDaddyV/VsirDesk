@@ -27,10 +27,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly ILayoutService _layoutService;
     private readonly IClockService _clockService;
     private readonly INoteService _noteService;
+    private readonly IQuickNoteService _quickNoteService;
+    private readonly IQuickTextService _quickTextService;
     private readonly ITodoService _todoService;
     private readonly IShortcutService _shortcutService;
     private readonly IWeatherService _weatherService;
     private readonly IHotkeyService _hotkeyService;
+    private readonly IClipboardMonitorService _clipboardMonitorService;
     private readonly IStartupService _startupService;
     private readonly ITodoBackupService _todoBackupService;
     private readonly ISystemMetricsService _systemMetricsService;
@@ -38,6 +41,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _systemMetricsTimer;
     private CancellationTokenSource? _weatherRefreshCts;
     private int _notesLoadGeneration;
+    private int _quickNotesLoadGeneration;
+    private int _quickTextLoadGeneration;
     private int _todosLoadGeneration;
     private int _shortcutsLoadGeneration;
     private int? _shortcutLimitPreview;
@@ -116,6 +121,18 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private ObservableCollection<NoteItem> _notes = new();
 
     [ObservableProperty]
+    private ObservableCollection<QuickNote> _quickNotes = new();
+
+    [ObservableProperty]
+    private ObservableCollection<ClipboardHistoryItem> _clipboardHistory = new();
+
+    [ObservableProperty]
+    private ObservableCollection<TextSnippet> _textSnippets = new();
+
+    [ObservableProperty]
+    private QuickTextMode _selectedQuickTextMode = QuickTextMode.History;
+
+    [ObservableProperty]
     private ObservableCollection<TodoItem> _todos = new();
 
     [ObservableProperty]
@@ -127,6 +144,16 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public ObservableCollection<ModuleSetting> ModuleSettings { get; } = new();
 
     public bool HasShortcuts => Shortcuts.Count > 0;
+
+    public bool HasQuickNotes => QuickNotes.Count > 0;
+
+    public bool HasClipboardHistory => ClipboardHistory.Count > 0;
+
+    public bool HasTextSnippets => TextSnippets.Count > 0;
+
+    public bool IsQuickTextHistorySelected => SelectedQuickTextMode == QuickTextMode.History;
+
+    public bool IsQuickTextSnippetsSelected => SelectedQuickTextMode == QuickTextMode.Snippets;
 
     [ObservableProperty]
     private bool _isShortcutAddMenuOpen;
@@ -213,12 +240,15 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         ILayoutService layoutService,
         IClockService clockService,
         INoteService noteService,
+        IQuickNoteService quickNoteService,
+        IQuickTextService quickTextService,
         ITodoService todoService,
         IShortcutService shortcutService,
         IWeatherService weatherService,
         IStartupService startupService,
         ITodoBackupService todoBackupService,
-        ISystemMetricsService systemMetricsService)
+        ISystemMetricsService systemMetricsService,
+        IClipboardMonitorService clipboardMonitorService)
     {
         _notificationService = notificationService;
         _settingsService = settingsService;
@@ -226,6 +256,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         _layoutService = layoutService;
         _clockService = clockService;
         _noteService = noteService;
+        _quickNoteService = quickNoteService;
+        _quickTextService = quickTextService;
         _todoService = todoService;
         _shortcutService = shortcutService;
         _weatherService = weatherService;
@@ -233,6 +265,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         _startupService = startupService;
         _todoBackupService = todoBackupService;
         _systemMetricsService = systemMetricsService;
+        _clipboardMonitorService = clipboardMonitorService;
+        _clipboardMonitorService.ClipboardHistoryChanged += ClipboardMonitor_OnHistoryChanged;
 
         LoadSettings();
         _layoutService.LoadOrGetDefault();
@@ -258,6 +292,16 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         UpdateSystemMetrics();
 
         _ = LoadNotesAsync();
+        if (IsModuleEnabled(DashboardModuleIds.QuickNotes))
+        {
+            _ = LoadQuickNotesAsync();
+        }
+
+        if (IsModuleEnabled(DashboardModuleIds.QuickText))
+        {
+            _ = LoadQuickTextAsync();
+        }
+
         _ = LoadTodosAsync();
         _ = LoadShortcutsAsync();
         _ = InitializeWeatherAsync();
@@ -300,7 +344,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             var json = _settingsService.GetValue(DashboardModuleCatalog.SettingsKey, string.Empty);
             var modules = DeserializeModuleSettings(json);
-            ApplyModuleSettingsCore(modules, persist: string.IsNullOrWhiteSpace(json));
+            ApplyModuleSettingsCore(modules, persist: ShouldPersistNormalizedModuleSettings(json, modules));
         }
         finally
         {
@@ -324,6 +368,26 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             Logger.LogError(ex, "MainWindowViewModel.DeserializeModuleSettings");
             return DashboardModuleCatalog.CreateDefaultModules();
+        }
+    }
+
+    private static bool ShouldPersistNormalizedModuleSettings(string? json, IEnumerable<ModuleSetting> modules)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return true;
+        }
+
+        try
+        {
+            var normalizedJson = JsonSerializer.Serialize(
+                DashboardModuleCatalog.Normalize(modules),
+                ModuleSettingsJsonOptions);
+            return !string.Equals(json.Trim(), normalizedJson, StringComparison.Ordinal);
+        }
+        catch
+        {
+            return true;
         }
     }
 
@@ -358,6 +422,18 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         if (IsModuleEnabled(DashboardModuleIds.TimeWeather) && !HasWeatherData)
         {
             _ = InitializeWeatherAsync();
+        }
+
+        if (IsModuleEnabled(DashboardModuleIds.QuickNotes) && QuickNotes.Count == 0)
+        {
+            _ = LoadQuickNotesAsync();
+        }
+
+        if (IsModuleEnabled(DashboardModuleIds.QuickText) &&
+            ClipboardHistory.Count == 0 &&
+            TextSnippets.Count == 0)
+        {
+            _ = LoadQuickTextAsync();
         }
     }
 
@@ -648,6 +724,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 _weatherService,
                 _startupService,
                 _todoBackupService,
+                _quickTextService,
                 this);
 
             var settingsWindow = new SettingsWindow(viewModel, ownerWidth, ownerHeight);
@@ -760,6 +837,326 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             {
                 _notificationService.ShowWarningMessage("便签列表加载失败，请稍后重试。");
             }
+        }
+    }
+
+    public async Task ReloadQuickNotesAsync() => await LoadQuickNotesAsync();
+
+    [RelayCommand]
+    private void NewQuickNote()
+    {
+        var window = new QuickNoteEditorWindow(
+            new QuickNoteEditorViewModel(_quickNoteService, _notificationService),
+            PanelWidth);
+        window.Owner = App.Current.MainWindow;
+        window.ShowDialog();
+        _ = LoadQuickNotesAsync();
+    }
+
+    [RelayCommand]
+    private void EditQuickNote(QuickNote? note)
+    {
+        if (note == null)
+        {
+            return;
+        }
+
+        var window = new QuickNoteEditorWindow(
+            new QuickNoteEditorViewModel(_quickNoteService, _notificationService, note),
+            PanelWidth);
+        window.Owner = App.Current.MainWindow;
+        window.ShowDialog();
+        _ = LoadQuickNotesAsync();
+    }
+
+    [RelayCommand]
+    private async Task DeleteQuickNoteAsync(QuickNote? note)
+    {
+        if (note == null)
+        {
+            return;
+        }
+
+        if (!_notificationService.ShowConfirmDialog($"确定删除便签「{note.DisplayTitle}」？", "删除确认"))
+        {
+            return;
+        }
+
+        await _quickNoteService.DeleteQuickNoteAsync(note.Id);
+        await LoadQuickNotesAsync();
+    }
+
+    [RelayCommand]
+    private async Task ToggleQuickNotePinnedAsync(QuickNote? note)
+    {
+        if (note == null)
+        {
+            return;
+        }
+
+        await _quickNoteService.SetPinnedAsync(note.Id, !note.IsPinned);
+        await LoadQuickNotesAsync();
+    }
+
+    [RelayCommand]
+    private void CopyQuickNoteContent(QuickNote? note)
+    {
+        if (note == null)
+        {
+            return;
+        }
+
+        var text = string.IsNullOrWhiteSpace(note.Content) ? note.Title : note.Content;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _notificationService.ShowWarningMessage("便签内容为空。");
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(text);
+            _notificationService.ShowSuccessMessage("便签内容已复制。");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "MainWindowViewModel.CopyQuickNoteContent");
+            _notificationService.ShowWarningMessage("复制失败，请稍后重试。");
+        }
+    }
+
+    private async Task LoadQuickNotesAsync()
+    {
+        var generation = Interlocked.Increment(ref _quickNotesLoadGeneration);
+        try
+        {
+            var notes = await _quickNoteService.GetAllQuickNotesAsync();
+            if (generation != _quickNotesLoadGeneration) return;
+
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                QuickNotes.Clear();
+                foreach (var note in notes.Take(5))
+                {
+                    QuickNotes.Add(note);
+                }
+
+                OnPropertyChanged(nameof(HasQuickNotes));
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "MainWindowViewModel.LoadQuickNotes");
+            if (generation == _quickNotesLoadGeneration)
+            {
+                _notificationService.ShowWarningMessage("便签列表加载失败，请稍后重试。");
+            }
+        }
+    }
+
+    public async Task ReloadQuickTextAsync() => await LoadQuickTextAsync();
+
+    partial void OnSelectedQuickTextModeChanged(QuickTextMode value)
+    {
+        OnPropertyChanged(nameof(IsQuickTextHistorySelected));
+        OnPropertyChanged(nameof(IsQuickTextSnippetsSelected));
+    }
+
+    private void ClipboardMonitor_OnHistoryChanged()
+    {
+        if (IsModuleEnabled(DashboardModuleIds.QuickText))
+        {
+            _ = LoadQuickTextAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void SelectQuickTextMode(string? mode)
+    {
+        SelectedQuickTextMode = string.Equals(mode, "Snippets", StringComparison.OrdinalIgnoreCase)
+            ? QuickTextMode.Snippets
+            : QuickTextMode.History;
+    }
+
+    [RelayCommand]
+    private async Task CopyClipboardHistoryAsync(ClipboardHistoryItem? item)
+    {
+        if (item == null || string.IsNullOrWhiteSpace(item.Content))
+        {
+            return;
+        }
+
+        if (_clipboardMonitorService.TrySetText(item.Content))
+        {
+            await _quickTextService.RecordClipboardTextAsync(item.Content);
+            await LoadQuickTextAsync();
+            _notificationService.ShowSuccessMessage("已复制。");
+        }
+        else
+        {
+            _notificationService.ShowWarningMessage("复制失败，请稍后重试。");
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteClipboardHistoryAsync(ClipboardHistoryItem? item)
+    {
+        if (item == null)
+        {
+            return;
+        }
+
+        await _quickTextService.DeleteClipboardHistoryAsync(item.Id);
+        await LoadQuickTextAsync();
+    }
+
+    [RelayCommand]
+    private async Task ClearClipboardHistoryAsync()
+    {
+        if (!_notificationService.ShowConfirmDialog("确定清空全部剪贴板历史？", "确认清空"))
+        {
+            return;
+        }
+
+        await _quickTextService.ClearClipboardHistoryAsync();
+        await LoadQuickTextAsync();
+        _notificationService.ShowSuccessMessage("剪贴板历史已清空。");
+    }
+
+    [RelayCommand]
+    private async Task FavoriteClipboardHistoryAsync(ClipboardHistoryItem? item)
+    {
+        var snippet = await _quickTextService.CreateSnippetFromHistoryAsync(item);
+        if (snippet == null)
+        {
+            _notificationService.ShowWarningMessage("收藏失败，请稍后重试。");
+            return;
+        }
+
+        SelectedQuickTextMode = QuickTextMode.Snippets;
+        await LoadQuickTextAsync();
+        _notificationService.ShowSuccessMessage("已收藏为常用短语。");
+    }
+
+    [RelayCommand]
+    private async Task CopyTextSnippetAsync(TextSnippet? snippet)
+    {
+        if (snippet == null || string.IsNullOrWhiteSpace(snippet.Content))
+        {
+            return;
+        }
+
+        if (_clipboardMonitorService.TrySetText(snippet.Content))
+        {
+            await _quickTextService.MarkSnippetUsedAsync(snippet.Id);
+            await LoadQuickTextAsync();
+            _notificationService.ShowSuccessMessage("已复制。");
+        }
+        else
+        {
+            _notificationService.ShowWarningMessage("复制失败，请稍后重试。");
+        }
+    }
+
+    [RelayCommand]
+    private void NewTextSnippet()
+    {
+        var window = new TextSnippetEditWindow(
+            new TextSnippetEditViewModel(_quickTextService),
+            PanelWidth);
+        window.Owner = App.Current.MainWindow;
+        if (window.ShowDialog() == true)
+        {
+            SelectedQuickTextMode = QuickTextMode.Snippets;
+            _ = LoadQuickTextAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void EditTextSnippet(TextSnippet? snippet)
+    {
+        if (snippet == null)
+        {
+            return;
+        }
+
+        var window = new TextSnippetEditWindow(
+            new TextSnippetEditViewModel(_quickTextService, snippet),
+            PanelWidth);
+        window.Owner = App.Current.MainWindow;
+        if (window.ShowDialog() == true)
+        {
+            _ = LoadQuickTextAsync();
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteTextSnippetAsync(TextSnippet? snippet)
+    {
+        if (snippet == null)
+        {
+            return;
+        }
+
+        if (!_notificationService.ShowConfirmDialog($"确定删除常用短语「{snippet.DisplayTitle}」？", "删除确认"))
+        {
+            return;
+        }
+
+        await _quickTextService.DeleteTextSnippetAsync(snippet.Id);
+        await LoadQuickTextAsync();
+    }
+
+    [RelayCommand]
+    private void OpenQuickTextManager()
+    {
+        var window = new QuickTextManagerWindow(
+            new QuickTextManagerViewModel(
+                _quickTextService,
+                _clipboardMonitorService,
+                _notificationService,
+                PanelWidth),
+            PanelWidth)
+        {
+            Owner = App.Current.MainWindow
+        };
+
+        window.ShowDialog();
+        _ = LoadQuickTextAsync();
+    }
+
+    private async Task LoadQuickTextAsync()
+    {
+        var generation = Interlocked.Increment(ref _quickTextLoadGeneration);
+        try
+        {
+            var historyTask = _quickTextService.GetClipboardHistoryAsync(5);
+            var snippetsTask = _quickTextService.GetTextSnippetsAsync();
+            await Task.WhenAll(historyTask, snippetsTask);
+
+            if (generation != _quickTextLoadGeneration) return;
+
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                ClipboardHistory.Clear();
+                foreach (var item in historyTask.Result.Take(5))
+                {
+                    ClipboardHistory.Add(item);
+                }
+
+                TextSnippets.Clear();
+                foreach (var snippet in snippetsTask.Result.Take(5))
+                {
+                    TextSnippets.Add(snippet);
+                }
+
+                OnPropertyChanged(nameof(HasClipboardHistory));
+                OnPropertyChanged(nameof(HasTextSnippets));
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "MainWindowViewModel.LoadQuickText");
         }
     }
 
@@ -1412,6 +1809,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
 
+        _clipboardMonitorService.ClipboardHistoryChanged -= ClipboardMonitor_OnHistoryChanged;
         _weatherRefreshTimer.Stop();
         _systemMetricsTimer.Stop();
         var weatherRefreshCts = _weatherRefreshCts;

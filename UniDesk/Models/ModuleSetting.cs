@@ -22,6 +22,8 @@ public static class DashboardModuleIds
     public const string HardwareMonitor = "HardwareMonitor";
     public const string Shortcuts = "Shortcuts";
     public const string Todos = "Todos";
+    public const string QuickNotes = "QuickNotes";
+    public const string QuickText = "QuickText";
 }
 
 public static class DashboardModuleCatalog
@@ -57,6 +59,20 @@ public static class DashboardModuleCatalog
             DisplayName = "待办事项",
             IsEnabled = true,
             SortOrder = 3
+        },
+        new()
+        {
+            ModuleId = DashboardModuleIds.QuickNotes,
+            DisplayName = "快速便签",
+            IsEnabled = true,
+            SortOrder = 4
+        },
+        new()
+        {
+            ModuleId = DashboardModuleIds.QuickText,
+            DisplayName = "快捷文本",
+            IsEnabled = true,
+            SortOrder = 5
         }
     ];
 

@@ -1,0 +1,180 @@
+<Window x:Class="UniDesk.TextSnippetEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Height="400"
+        MinHeight="360"
+        KeyDown="TextSnippetEditWindow_OnKeyDown">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="DlgBackground" Color="#E6FFFFFF"/>
+        <SolidColorBrush x:Key="DlgTextPrimary" Color="#1E293B"/>
+        <SolidColorBrush x:Key="DlgTextSecondary" Color="#64748B"/>
+        <SolidColorBrush x:Key="DlgBorder" Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="DlgInputBackground" Color="#F8FAFC"/>
+        <SolidColorBrush x:Key="DlgAccent" Color="#3B82F6"/>
+
+        <Style x:Key="DlgLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource DlgTextSecondary}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <Style x:Key="DlgButton" TargetType="Button">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinWidth" Value="78"/>
+            <Setter Property="Background" Value="{StaticResource DlgInputBackground}"/>
+            <Setter Property="Foreground" Value="{StaticResource DlgTextSecondary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DlgBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DlgPrimaryButton" TargetType="Button" BasedOn="{StaticResource DlgButton}">
+            <Setter Property="Background" Value="{StaticResource DlgAccent}"/>
+            <Setter Property="Foreground" Value="#0D2744"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="DialogRoot"
+            Background="{StaticResource DlgBackground}"
+            BorderBrush="{StaticResource DlgBorder}"
+            BorderThickness="1"
+            CornerRadius="12"
+            Margin="4"
+            MouseLeftButtonDown="DialogRoot_OnMouseLeftButtonDown">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="14,12,12,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource DlgAccent}" Margin="0,0,8,0">
+                        <TextBlock Text="&#xE8C8;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   Foreground="#0D2744"
+                                   FontSize="13"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="{Binding WindowTitle}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource DlgTextPrimary}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button HorizontalAlignment="Right"
+                        Width="28"
+                        Height="28"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Cursor="Hand"
+                        Click="CloseButton_OnClick">
+                    <TextBlock Text="&#xE711;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="11"
+                               Foreground="{StaticResource DlgTextSecondary}"/>
+                </Button>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="14,0,14,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="标题" Style="{StaticResource DlgLabel}"/>
+                <TextBox Grid.Row="1"
+                         Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                         Height="32"
+                         MaxLength="80"
+                         FontSize="12"
+                         Foreground="{StaticResource DlgTextPrimary}"
+                         Background="{StaticResource DlgInputBackground}"
+                         BorderBrush="{StaticResource DlgBorder}"
+                         BorderThickness="1"
+                         Padding="9,5"
+                         Margin="0,0,0,8"/>
+
+                <Grid Grid.Row="2" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="分类" Style="{StaticResource DlgLabel}"/>
+                        <ComboBox ItemsSource="{Binding Categories}"
+                                  SelectedItem="{Binding Category}"
+                                  Height="30"
+                                  FontSize="12"
+                                  Foreground="{StaticResource DlgTextPrimary}"
+                                  Background="{StaticResource DlgInputBackground}"/>
+                    </StackPanel>
+                    <CheckBox Grid.Column="1"
+                              Content="置顶"
+                              IsChecked="{Binding IsPinned}"
+                              FontSize="12"
+                              Foreground="{StaticResource DlgTextSecondary}"
+                              VerticalAlignment="Bottom"
+                              Margin="12,0,0,6"/>
+                </Grid>
+
+                <TextBlock Grid.Row="3" Text="内容" Style="{StaticResource DlgLabel}"/>
+                <TextBox Grid.Row="4"
+                         Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         FontSize="12"
+                         Foreground="{StaticResource DlgTextPrimary}"
+                         Background="{StaticResource DlgInputBackground}"
+                         BorderBrush="{StaticResource DlgBorder}"
+                         BorderThickness="1"
+                         Padding="10,8"
+                         Margin="0,0,0,8"/>
+            </Grid>
+
+            <Border Grid.Row="2"
+                    BorderBrush="{StaticResource DlgBorder}"
+                    BorderThickness="0,1,0,0"
+                    Padding="14,10">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Style="{StaticResource DlgButton}"
+                            Content="取消"
+                            Margin="0,0,8,0"
+                            Click="CloseButton_OnClick"/>
+                    <Button Style="{StaticResource DlgPrimaryButton}"
+                            Content="保存"
+                            IsDefault="True"
+                            Click="SaveButton_OnClick"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

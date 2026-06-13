@@ -14,6 +14,7 @@ public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
     private readonly ISettingsService _settingsService;
+    private readonly IClipboardMonitorService _clipboardMonitorService;
     private Point _shortcutDragStart;
     private ShortcutItem? _draggedShortcut;
     private Point _scrollPanStart;
@@ -27,12 +28,17 @@ public partial class MainWindow : Window
 
     public bool AllowShutdown { get; set; }
 
-    public MainWindow(MainWindowViewModel viewModel, IWindowService windowService, ISettingsService settingsService)
+    public MainWindow(
+        MainWindowViewModel viewModel,
+        IWindowService windowService,
+        ISettingsService settingsService,
+        IClipboardMonitorService clipboardMonitorService)
     {
         InitializeComponent();
         DataContext = viewModel;
         _viewModel = viewModel;
         _settingsService = settingsService;
+        _clipboardMonitorService = clipboardMonitorService;
         _ = windowService;
 
         AppIconHelper.ApplyWindowIcon(this);
@@ -67,7 +73,7 @@ public partial class MainWindow : Window
         MaxHeight = _viewModel.IsPanelCollapsed ? CollapsedPanelHeight : IWindowService.MaxPanelHeight;
         Height = targetHeight;
         ClampToVisibleWorkArea();
-        if (MainModulesGrid.RowDefinitions.Count < 4)
+        if (MainModulesGrid.RowDefinitions.Count == 0)
         {
             return;
         }
@@ -75,18 +81,16 @@ public partial class MainWindow : Window
         if (_viewModel.IsPanelCollapsed)
         {
             MainModulesGrid.Margin = new Thickness(12, 0, 12, 6);
+            foreach (var row in MainModulesGrid.RowDefinitions)
+            {
+                row.Height = new GridLength(0);
+            }
+
             MainModulesGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
-            MainModulesGrid.RowDefinitions[1].Height = new GridLength(0);
-            MainModulesGrid.RowDefinitions[2].Height = new GridLength(0);
-            MainModulesGrid.RowDefinitions[3].Height = new GridLength(0);
         }
         else
         {
             MainModulesGrid.Margin = new Thickness(12, 0, 12, 10);
-            MainModulesGrid.RowDefinitions[0].Height = new GridLength(24, GridUnitType.Star);
-            MainModulesGrid.RowDefinitions[1].Height = new GridLength(16, GridUnitType.Star);
-            MainModulesGrid.RowDefinitions[2].Height = new GridLength(26, GridUnitType.Star);
-            MainModulesGrid.RowDefinitions[3].Height = new GridLength(34, GridUnitType.Star);
         }
 
         ApplyModuleLayout();
@@ -135,12 +139,13 @@ public partial class MainWindow : Window
     {
         UpdateWindowContainerClip();
         _viewModel.ApplyWindowSettings();
+        _clipboardMonitorService.Start(this);
         ApplyModuleLayout();
     }
 
     private void ApplyModuleLayout()
     {
-        if (MainModulesGrid.RowDefinitions.Count < 4)
+        if (MainModulesGrid.RowDefinitions.Count == 0)
         {
             return;
         }
@@ -201,6 +206,8 @@ public partial class MainWindow : Window
         DashboardModuleIds.HardwareMonitor => HardwareMonitorModule,
         DashboardModuleIds.Shortcuts => ShortcutsModule,
         DashboardModuleIds.Todos => TodosModule,
+        DashboardModuleIds.QuickNotes => QuickNotesModule,
+        DashboardModuleIds.QuickText => QuickTextModule,
         _ => null
     };
 
@@ -210,6 +217,8 @@ public partial class MainWindow : Window
         yield return HardwareMonitorModule;
         yield return ShortcutsModule;
         yield return TodosModule;
+        yield return QuickNotesModule;
+        yield return QuickTextModule;
     }
 
     private static double GetModuleWeight(string moduleId) => moduleId switch
@@ -218,6 +227,8 @@ public partial class MainWindow : Window
         DashboardModuleIds.HardwareMonitor => 16,
         DashboardModuleIds.Shortcuts => 26,
         DashboardModuleIds.Todos => 34,
+        DashboardModuleIds.QuickNotes => 28,
+        DashboardModuleIds.QuickText => 28,
         _ => 20
     };
 
@@ -583,6 +594,7 @@ public partial class MainWindow : Window
 
         if (AllowShutdown)
         {
+            _clipboardMonitorService.Stop();
             return;
         }
 

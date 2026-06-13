@@ -434,9 +434,75 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                    <TextBlock Text="快捷文本 / 剪贴板" Style="{StaticResource DlgSectionTitle}"/>
+                    <Grid Style="{StaticResource DlgToggleRow}">
+                        <TextBlock Text="启用剪贴板历史"
+                                   FontSize="12"
+                                   Foreground="{StaticResource DlgTextPrimary}"
+                                   VerticalAlignment="Center"/>
+                        <CheckBox HorizontalAlignment="Right" IsChecked="{Binding ClipboardHistoryEnabled}"/>
+                    </Grid>
+                    <Grid Style="{StaticResource DlgToggleRow}">
+                        <TextBlock Text="自动过滤敏感内容"
+                                   FontSize="12"
+                                   Foreground="{StaticResource DlgTextPrimary}"
+                                   VerticalAlignment="Center"/>
+                        <CheckBox HorizontalAlignment="Right" IsChecked="{Binding ClipboardSensitiveFilterEnabled}"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <TextBlock Text="最大保存数量"
+                                   FontSize="12"
+                                   Foreground="{StaticResource DlgTextPrimary}"
+                                   VerticalAlignment="Center"/>
+                        <WrapPanel HorizontalAlignment="Right">
+                            <Button Style="{StaticResource DlgGhostButton}"
+                                    Content="20"
+                                    Width="44"
+                                    Height="28"
+                                    Padding="0"
+                                    Margin="0,0,5,0"
+                                    Command="{Binding SelectClipboardHistoryLimitCommand}"
+                                    CommandParameter="20"/>
+                            <Button Style="{StaticResource DlgGhostButton}"
+                                    Content="50"
+                                    Width="44"
+                                    Height="28"
+                                    Padding="0"
+                                    Margin="0,0,5,0"
+                                    Command="{Binding SelectClipboardHistoryLimitCommand}"
+                                    CommandParameter="50"/>
+                            <Button Style="{StaticResource DlgGhostButton}"
+                                    Content="100"
+                                    Width="48"
+                                    Height="28"
+                                    Padding="0"
+                                    Margin="0,0,5,0"
+                                    Command="{Binding SelectClipboardHistoryLimitCommand}"
+                                    CommandParameter="100"/>
+                            <Button Style="{StaticResource DlgGhostButton}"
+                                    Content="200"
+                                    Width="48"
+                                    Height="28"
+                                    Padding="0"
+                                    Command="{Binding SelectClipboardHistoryLimitCommand}"
+                                    CommandParameter="200"/>
+                        </WrapPanel>
+                    </Grid>
+                    <Grid Margin="0,0,0,14">
+                        <TextBlock Text="{Binding ClipboardHistoryMaxCount, StringFormat=当前：{0} 条}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DlgTextSecondary}"
+                                   VerticalAlignment="Center"/>
+                        <Button Style="{StaticResource DlgGhostButton}"
+                                Content="清空历史"
+                                Padding="10,0"
+                                HorizontalAlignment="Right"
+                                Command="{Binding ClearClipboardHistoryFromSettingsCommand}"/>
+                    </Grid>
+
                     <TextBlock Text="系统设置" Style="{StaticResource DlgSectionTitle}"/>
                     <Grid Margin="0,0,0,10">
-                        <TextBlock Text="待办事项备份还原"
+                        <TextBlock Text="待办事项、快速便签与快捷文本备份还原"
                                    FontSize="12"
                                    Foreground="{StaticResource DlgTextPrimary}"
                                    VerticalAlignment="Center"/>

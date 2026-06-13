@@ -1,0 +1,203 @@
+<Window x:Class="UniDesk.QuickNoteEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="{Binding WindowTitle}"
+        Height="430"
+        MinHeight="360"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        KeyDown="QuickNoteEditorWindow_OnKeyDown">
+
+    <Window.Resources>
+        <SolidColorBrush x:Key="DlgBackground" Color="#E6FFFFFF"/>
+        <SolidColorBrush x:Key="DlgTextPrimary" Color="#1E293B"/>
+        <SolidColorBrush x:Key="DlgTextSecondary" Color="#64748B"/>
+        <SolidColorBrush x:Key="DlgBorder" Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="DlgInputBackground" Color="#F8FAFC"/>
+        <SolidColorBrush x:Key="DlgAccent" Color="#3B82F6"/>
+        <SolidColorBrush x:Key="DlgAccentSoft" Color="#1A3B82F6"/>
+
+        <Style x:Key="DlgLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource DlgTextSecondary}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+
+        <Style x:Key="DlgIconButton" TargetType="Button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{StaticResource DlgTextSecondary}"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="7">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource DlgAccentSoft}"/>
+                                <Setter Property="Foreground" Value="{StaticResource DlgAccent}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DlgGhostButton" TargetType="Button">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinWidth" Value="72"/>
+            <Setter Property="Background" Value="{StaticResource DlgInputBackground}"/>
+            <Setter Property="Foreground" Value="{StaticResource DlgTextSecondary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DlgBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="10,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DlgDangerButton" TargetType="Button" BasedOn="{StaticResource DlgGhostButton}">
+            <Setter Property="Foreground" Value="#DC2626"/>
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="DialogRoot"
+            Background="{StaticResource DlgBackground}"
+            BorderBrush="{StaticResource DlgBorder}"
+            BorderThickness="1"
+            CornerRadius="12"
+            Margin="4"
+            MouseLeftButtonDown="DialogRoot_OnMouseLeftButtonDown">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="14,12,12,8">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource DlgAccent}" Margin="0,0,8,0">
+                        <TextBlock Text="&#xE70B;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   Foreground="#0D2744"
+                                   FontSize="13"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="{Binding WindowTitle}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource DlgTextPrimary}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button Style="{StaticResource DlgIconButton}"
+                        HorizontalAlignment="Right"
+                        Content="&#xE711;"
+                        FontSize="11"
+                        Click="CloseButton_OnClick"/>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="14,0,14,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="标题" Style="{StaticResource DlgLabel}"/>
+                <TextBox Grid.Row="1"
+                         Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                         Height="34"
+                         MaxLength="80"
+                         FontSize="13"
+                         Foreground="{StaticResource DlgTextPrimary}"
+                         Background="{StaticResource DlgInputBackground}"
+                         BorderBrush="{StaticResource DlgBorder}"
+                         BorderThickness="1"
+                         Padding="10,6"
+                         Margin="0,0,0,10"/>
+
+                <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="正文" Style="{StaticResource DlgLabel}"/>
+                    <TextBox x:Name="ContentBox"
+                             Grid.Row="1"
+                             Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
+                             AcceptsTab="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             FontSize="13"
+                             Foreground="{StaticResource DlgTextPrimary}"
+                             Background="{StaticResource DlgInputBackground}"
+                             BorderBrush="{StaticResource DlgBorder}"
+                             BorderThickness="1"
+                             Padding="10,8"
+                             Margin="0,0,0,10"
+                             CaretBrush="{StaticResource DlgTextPrimary}"/>
+                </Grid>
+
+                <Grid Grid.Row="3">
+                    <CheckBox Content="置顶"
+                              IsChecked="{Binding IsPinned}"
+                              Foreground="{StaticResource DlgTextSecondary}"
+                              FontSize="12"
+                              VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding SaveStatus}"
+                               HorizontalAlignment="Right"
+                               Foreground="{StaticResource DlgTextSecondary}"
+                               FontSize="11"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Grid>
+
+            <Border Grid.Row="2"
+                    BorderBrush="{StaticResource DlgBorder}"
+                    BorderThickness="0,1,0,0"
+                    Padding="14,10">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <Button Style="{StaticResource DlgGhostButton}"
+                                Content="复制内容"
+                                Margin="0,0,8,0"
+                                Click="CopyButton_OnClick"/>
+                        <Button Style="{StaticResource DlgDangerButton}"
+                                Content="删除"
+                                Click="DeleteButton_OnClick"/>
+                    </StackPanel>
+                    <Button Style="{StaticResource DlgGhostButton}"
+                            Content="关闭"
+                            HorizontalAlignment="Right"
+                            Click="CloseButton_OnClick"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

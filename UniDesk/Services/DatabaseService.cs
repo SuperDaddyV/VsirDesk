@@ -6,7 +6,7 @@ namespace UniDesk.Services;
 
 public class DatabaseService : IDatabaseService
 {
-    private const string DatabaseVersion = "1.3";
+    private const string DatabaseVersion = "1.5";
     private readonly string _connectionString;
 
     public DatabaseService(string? connectionString = null)
@@ -82,6 +82,41 @@ public class DatabaseService : IDatabaseService
             )",
             "CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON Notes(UpdatedAt DESC)",
             @"
+            CREATE TABLE IF NOT EXISTS QuickNotes (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Title TEXT NOT NULL,
+                Content TEXT NOT NULL DEFAULT '',
+                IsPinned INTEGER NOT NULL DEFAULT 0,
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_quick_notes_order ON QuickNotes(IsPinned DESC, SortOrder ASC, UpdatedAt DESC)",
+            @"
+            CREATE TABLE IF NOT EXISTS ClipboardHistory (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Content TEXT NOT NULL,
+                ContentHash TEXT NOT NULL UNIQUE,
+                CreatedAt TEXT NOT NULL,
+                LastUsedAt TEXT NOT NULL,
+                UseCount INTEGER NOT NULL DEFAULT 1
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_clipboard_history_last_used ON ClipboardHistory(LastUsedAt DESC)",
+            @"
+            CREATE TABLE IF NOT EXISTS TextSnippets (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Title TEXT NOT NULL,
+                Content TEXT NOT NULL,
+                Category TEXT NOT NULL DEFAULT '默认',
+                IsPinned INTEGER NOT NULL DEFAULT 0,
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                UseCount INTEGER NOT NULL DEFAULT 0,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                LastUsedAt TEXT
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_text_snippets_order ON TextSnippets(IsPinned DESC, SortOrder ASC, LastUsedAt DESC)",
+            @"
             CREATE TABLE IF NOT EXISTS Todos (
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Title TEXT NOT NULL,
@@ -145,7 +180,10 @@ public class DatabaseService : IDatabaseService
             { WeatherApiDefaults.DefaultApiKeySettingKey, WeatherApiDefaults.BuiltInApiKeyEncrypted },
             { WeatherApiDefaults.DefaultApiHostSettingKey, WeatherApiDefaults.BuiltInApiHostEncrypted },
             { "ShortcutMaxCount", "9" },
-            { DashboardModuleCatalog.SettingsKey, "[{\"moduleId\":\"TimeWeather\",\"displayName\":\"时间天气\",\"isEnabled\":true,\"sortOrder\":0},{\"moduleId\":\"HardwareMonitor\",\"displayName\":\"硬件监视\",\"isEnabled\":true,\"sortOrder\":1},{\"moduleId\":\"Shortcuts\",\"displayName\":\"快捷方式\",\"isEnabled\":true,\"sortOrder\":2},{\"moduleId\":\"Todos\",\"displayName\":\"待办事项\",\"isEnabled\":true,\"sortOrder\":3}]" }
+            { QuickTextService.HistoryEnabledSettingKey, "true" },
+            { QuickTextService.SensitiveFilterSettingKey, "true" },
+            { QuickTextService.HistoryMaxCountSettingKey, QuickTextService.DefaultHistoryLimit.ToString() },
+            { DashboardModuleCatalog.SettingsKey, "[{\"moduleId\":\"TimeWeather\",\"displayName\":\"时间天气\",\"isEnabled\":true,\"sortOrder\":0},{\"moduleId\":\"HardwareMonitor\",\"displayName\":\"硬件监视\",\"isEnabled\":true,\"sortOrder\":1},{\"moduleId\":\"Shortcuts\",\"displayName\":\"快捷方式\",\"isEnabled\":true,\"sortOrder\":2},{\"moduleId\":\"Todos\",\"displayName\":\"待办事项\",\"isEnabled\":true,\"sortOrder\":3},{\"moduleId\":\"QuickNotes\",\"displayName\":\"快速便签\",\"isEnabled\":true,\"sortOrder\":4},{\"moduleId\":\"QuickText\",\"displayName\":\"快捷文本\",\"isEnabled\":true,\"sortOrder\":5}]" }
         };
 
         foreach (var setting in defaultSettings)
@@ -178,13 +216,54 @@ public class DatabaseService : IDatabaseService
         {
             await EnsureEncryptedWeatherDefaultsAsync(connection);
         }
+
+        if (string.Compare(fromVersion, "1.4", StringComparison.Ordinal) < 0 &&
+            string.Compare(toVersion, "1.4", StringComparison.Ordinal) >= 0)
+        {
+            await EnsureQuickNotesTableAsync(connection);
+        }
+
+        if (string.Compare(fromVersion, "1.5", StringComparison.Ordinal) < 0 &&
+            string.Compare(toVersion, "1.5", StringComparison.Ordinal) >= 0)
+        {
+            await EnsureQuickTextTablesAsync(connection);
+            await EnsureQuickTextSettingsAsync(connection);
+        }
     }
 
     private async Task EnsureSchemaUpdatesAsync(SqliteConnection connection)
     {
         await TryAddColumnAsync(connection, "Todos", "Priority", "INTEGER NOT NULL DEFAULT 1");
         await TryAddColumnAsync(connection, "Shortcuts", "LaunchArguments", "TEXT");
+        await EnsureQuickNotesTableAsync(connection);
+        await EnsureQuickTextTablesAsync(connection);
+        await EnsureQuickTextSettingsAsync(connection);
         await EnsureEncryptedWeatherDefaultsAsync(connection);
+    }
+
+    private static async Task EnsureQuickNotesTableAsync(SqliteConnection connection)
+    {
+        var commands = new[]
+        {
+            @"
+            CREATE TABLE IF NOT EXISTS QuickNotes (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Title TEXT NOT NULL,
+                Content TEXT NOT NULL DEFAULT '',
+                IsPinned INTEGER NOT NULL DEFAULT 0,
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_quick_notes_order ON QuickNotes(IsPinned DESC, SortOrder ASC, UpdatedAt DESC)"
+        };
+
+        foreach (var sql in commands)
+        {
+            var command = connection.CreateCommand();
+            command.CommandText = sql;
+            await command.ExecuteNonQueryAsync();
+        }
     }
 
     private static async Task EnsureEncryptedWeatherDefaultsAsync(SqliteConnection connection)
@@ -213,6 +292,63 @@ public class DatabaseService : IDatabaseService
             updateCommand.Parameters.AddWithValue("@key", setting.Key);
             updateCommand.Parameters.AddWithValue("@value", setting.Value);
             await updateCommand.ExecuteNonQueryAsync();
+        }
+    }
+
+    private static async Task EnsureQuickTextTablesAsync(SqliteConnection connection)
+    {
+        var commands = new[]
+        {
+            @"
+            CREATE TABLE IF NOT EXISTS ClipboardHistory (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Content TEXT NOT NULL,
+                ContentHash TEXT NOT NULL UNIQUE,
+                CreatedAt TEXT NOT NULL,
+                LastUsedAt TEXT NOT NULL,
+                UseCount INTEGER NOT NULL DEFAULT 1
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_clipboard_history_last_used ON ClipboardHistory(LastUsedAt DESC)",
+            @"
+            CREATE TABLE IF NOT EXISTS TextSnippets (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Title TEXT NOT NULL,
+                Content TEXT NOT NULL,
+                Category TEXT NOT NULL DEFAULT '默认',
+                IsPinned INTEGER NOT NULL DEFAULT 0,
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                UseCount INTEGER NOT NULL DEFAULT 0,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                LastUsedAt TEXT
+            )",
+            "CREATE INDEX IF NOT EXISTS idx_text_snippets_order ON TextSnippets(IsPinned DESC, SortOrder ASC, LastUsedAt DESC)"
+        };
+
+        foreach (var sql in commands)
+        {
+            var command = connection.CreateCommand();
+            command.CommandText = sql;
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+
+    private static async Task EnsureQuickTextSettingsAsync(SqliteConnection connection)
+    {
+        var defaults = new Dictionary<string, string>
+        {
+            { QuickTextService.HistoryEnabledSettingKey, "true" },
+            { QuickTextService.SensitiveFilterSettingKey, "true" },
+            { QuickTextService.HistoryMaxCountSettingKey, QuickTextService.DefaultHistoryLimit.ToString() }
+        };
+
+        foreach (var setting in defaults)
+        {
+            var command = connection.CreateCommand();
+            command.CommandText = "INSERT OR IGNORE INTO Settings (Key, Value) VALUES (@key, @value)";
+            command.Parameters.AddWithValue("@key", setting.Key);
+            command.Parameters.AddWithValue("@value", setting.Value);
+            await command.ExecuteNonQueryAsync();
         }
     }
 
