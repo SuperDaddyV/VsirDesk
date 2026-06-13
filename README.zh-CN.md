@@ -2,6 +2,13 @@
 
 UniDesk 是一个轻量、个性化、清爽好用的 Windows 桌面侧边栏工具，把时间天气、硬件监视、快捷方式、待办事项、快速便签和快捷文本整合进一个顺手的桌面工作台。
 
+<p align="center">
+  <a href="README.md">English</a> ·
+  简体中文 ·
+  <a href="README.ja-JP.md">日本語</a> ·
+  <a href="README.es-ES.md">Español</a>
+</p>
+
 ![UniDesk 产品展示图](images/unidesk-hero.png)
 
 ## ✨ 主要特性
