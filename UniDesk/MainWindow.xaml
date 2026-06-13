@@ -17,7 +17,12 @@
         ShowInTaskbar="False"
         Topmost="{Binding IsTopMost}"
         ResizeMode="NoResize"
-        Loaded="MainWindow_OnLoaded">
+        Loaded="MainWindow_OnLoaded"
+        AllowDrop="True"
+        PreviewDragEnter="Window_OnPreviewDragEnter"
+        PreviewDragOver="Window_OnPreviewDragOver"
+        PreviewDragLeave="Window_OnPreviewDragLeave"
+        PreviewDrop="Window_OnPreviewDrop">
 
     <Window.Resources>
         <helpers:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>

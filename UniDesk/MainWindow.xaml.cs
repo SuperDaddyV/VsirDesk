@@ -494,6 +494,38 @@ public partial class MainWindow : Window
         }
     }
 
+    private void Window_OnPreviewDragEnter(object sender, DragEventArgs e) =>
+        UpdateWindowFileDropFeedback(e);
+
+    private void Window_OnPreviewDragOver(object sender, DragEventArgs e) =>
+        UpdateWindowFileDropFeedback(e);
+
+    private void Window_OnPreviewDragLeave(object sender, DragEventArgs e)
+    {
+        if (!IsShortcutFileDrop(e))
+        {
+            return;
+        }
+
+        _viewModel.IsShortcutDropTargetActive = false;
+    }
+
+    private async void Window_OnPreviewDrop(object sender, DragEventArgs e)
+    {
+        if (!IsShortcutFileDrop(e) || !IsPointerInsideShortcutModule(e))
+        {
+            _viewModel.IsShortcutDropTargetActive = false;
+            return;
+        }
+
+        e.Effects = DragDropEffects.Copy;
+        e.Handled = true;
+        _viewModel.IsShortcutDropTargetActive = false;
+
+        var paths = GetFileDropPaths(e);
+        await _viewModel.AddShortcutsFromPathsAsync(paths);
+    }
+
     private void ShortcutModule_OnPreviewDragEnter(object sender, DragEventArgs e) =>
         UpdateShortcutFileDropFeedback(e);
 
@@ -526,6 +558,25 @@ public partial class MainWindow : Window
         await _viewModel.AddShortcutsFromPathsAsync(paths);
     }
 
+    private void UpdateWindowFileDropFeedback(DragEventArgs e)
+    {
+        if (!IsShortcutFileDrop(e))
+        {
+            return;
+        }
+
+        if (!IsPointerInsideShortcutModule(e))
+        {
+            _viewModel.IsShortcutDropTargetActive = false;
+            e.Effects = DragDropEffects.None;
+            return;
+        }
+
+        e.Effects = DragDropEffects.Copy;
+        _viewModel.IsShortcutDropTargetActive = true;
+        e.Handled = true;
+    }
+
     private void UpdateShortcutFileDropFeedback(DragEventArgs e)
     {
         if (!IsShortcutFileDrop(e))
@@ -540,6 +591,20 @@ public partial class MainWindow : Window
 
     private static bool IsShortcutFileDrop(DragEventArgs e) =>
         e.Data.GetDataPresent(DataFormats.FileDrop) && GetFileDropPaths(e).Count > 0;
+
+    private bool IsPointerInsideShortcutModule(DragEventArgs e)
+    {
+        if (ShortcutsModule.Visibility != Visibility.Visible || !ShortcutsModule.IsVisible)
+        {
+            return false;
+        }
+
+        var point = e.GetPosition(ShortcutsModule);
+        return point.X >= 0
+               && point.Y >= 0
+               && point.X <= ShortcutsModule.ActualWidth
+               && point.Y <= ShortcutsModule.ActualHeight;
+    }
 
     private static IReadOnlyList<string> GetFileDropPaths(DragEventArgs e)
     {
