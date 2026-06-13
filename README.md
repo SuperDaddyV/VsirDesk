@@ -93,7 +93,7 @@ Auto location uses the current network exit IP. It usually works well on normal 
 Download the latest installer from [GitHub Releases](https://github.com/SuperDaddyV/UniDesk/releases/latest) and run:
 
 ```powershell
-UniDesk_Setup_1.3.1.exe
+UniDesk_Setup_1.3.2.exe
 ```
 
 System requirements:

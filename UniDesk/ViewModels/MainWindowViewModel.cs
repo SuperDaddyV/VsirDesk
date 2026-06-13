@@ -46,6 +46,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private int _todosLoadGeneration;
     private int _shortcutsLoadGeneration;
     private int? _shortcutLimitPreview;
+    private List<ShortcutItem> _allShortcuts = [];
     private bool _disposed;
     private bool _isLoadingModuleSettings;
 
@@ -143,7 +144,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<ModuleSetting> ModuleSettings { get; } = new();
 
-    public bool HasShortcuts => Shortcuts.Count > 0;
+    public bool HasShortcuts => _allShortcuts.Count > 0;
 
     public bool HasQuickNotes => QuickNotes.Count > 0;
 
@@ -1287,6 +1288,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             IsSystemAppMenuOpen = false;
         }
 
+        NotifyShortcutOrderCommandsCanExecuteChanged();
         RefreshShortcutDisplayEntries();
     }
 
@@ -1364,15 +1366,14 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             LaunchArguments = app.LaunchArguments,
             IconLookupPath = app.IconLookupPath ?? app.Path,
             BundledIconFileName = app.BundledIconFileName,
-            Type = app.Type,
-            SortOrder = Shortcuts.Count
+            Type = app.Type
         });
     }
 
     public void SetShortcutLimitPreview(int? limit)
     {
         _shortcutLimitPreview = limit;
-        RefreshShortcutDisplayEntries();
+        RefreshVisibleShortcuts();
     }
 
     private int GetShortcutMaxCount() =>
@@ -1404,6 +1405,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
+        shortcut.SortOrder = GetNextShortcutSortOrder(allShortcuts);
         var id = await _shortcutService.CreateShortcutAsync(shortcut);
         if (id <= 0)
         {
@@ -1461,7 +1463,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
                 try
                 {
-                    var shortcut = ShortcutPathHelper.CreateFromPath(path, allShortcuts.Count);
+                    var shortcut = ShortcutPathHelper.CreateFromPath(path, GetNextShortcutSortOrder(allShortcuts));
                     var id = await _shortcutService.CreateShortcutAsync(shortcut);
                     if (id <= 0)
                     {
@@ -1506,6 +1508,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    private static int GetNextShortcutSortOrder(IReadOnlyCollection<ShortcutItem> shortcuts) =>
+        shortcuts.Count == 0 ? 0 : shortcuts.Max(shortcut => shortcut.SortOrder) + 1;
+
     private static string NormalizeShortcutPath(string path)
     {
         try
@@ -1534,6 +1539,22 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         OnPropertyChanged(nameof(HasShortcuts));
+        NotifyShortcutOrderCommandsCanExecuteChanged();
+    }
+
+    private void RefreshVisibleShortcuts()
+    {
+        Shortcuts.Clear();
+        foreach (var shortcut in _allShortcuts
+                     .OrderBy(shortcut => shortcut.SortOrder)
+                     .ThenBy(shortcut => shortcut.CreatedAt)
+                     .ThenBy(shortcut => shortcut.Id)
+                     .Take(GetShortcutMaxCount()))
+        {
+            Shortcuts.Add(shortcut);
+        }
+
+        RefreshShortcutDisplayEntries();
     }
 
     [RelayCommand]
@@ -1545,6 +1566,71 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         await LoadShortcutsAsync();
     }
 
+    [RelayCommand(CanExecute = nameof(CanMoveShortcutUp))]
+    private async Task MoveShortcutUpAsync(ShortcutItem? shortcut)
+    {
+        var index = GetShortcutIndex(shortcut);
+        if (index <= 0)
+        {
+            return;
+        }
+
+        await MoveShortcutToIndexAsync(shortcut, index - 1);
+    }
+
+    private bool CanMoveShortcutUp(ShortcutItem? shortcut) =>
+        IsEditingShortcuts && GetShortcutIndex(shortcut) > 0;
+
+    [RelayCommand(CanExecute = nameof(CanMoveShortcutDown))]
+    private async Task MoveShortcutDownAsync(ShortcutItem? shortcut)
+    {
+        var index = GetShortcutIndex(shortcut);
+        if (index < 0 || index >= _allShortcuts.Count - 1)
+        {
+            return;
+        }
+
+        await MoveShortcutToIndexAsync(shortcut, index + 1);
+    }
+
+    private bool CanMoveShortcutDown(ShortcutItem? shortcut)
+    {
+        var index = GetShortcutIndex(shortcut);
+        return IsEditingShortcuts && index >= 0 && index < _allShortcuts.Count - 1;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMoveShortcutToFirst))]
+    private async Task MoveShortcutToFirstAsync(ShortcutItem? shortcut)
+    {
+        if (GetShortcutIndex(shortcut) <= 0)
+        {
+            return;
+        }
+
+        await MoveShortcutToIndexAsync(shortcut, 0);
+    }
+
+    private bool CanMoveShortcutToFirst(ShortcutItem? shortcut) =>
+        IsEditingShortcuts && GetShortcutIndex(shortcut) > 0;
+
+    [RelayCommand(CanExecute = nameof(CanMoveShortcutToLast))]
+    private async Task MoveShortcutToLastAsync(ShortcutItem? shortcut)
+    {
+        var index = GetShortcutIndex(shortcut);
+        if (index < 0 || index >= _allShortcuts.Count - 1)
+        {
+            return;
+        }
+
+        await MoveShortcutToIndexAsync(shortcut, _allShortcuts.Count - 1);
+    }
+
+    private bool CanMoveShortcutToLast(ShortcutItem? shortcut)
+    {
+        var index = GetShortcutIndex(shortcut);
+        return IsEditingShortcuts && index >= 0 && index < _allShortcuts.Count - 1;
+    }
+
     public async Task MoveShortcutAsync(ShortcutItem? source, ShortcutItem? target)
     {
         if (source == null || target == null || source.Id == target.Id)
@@ -1552,23 +1638,65 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var sourceIndex = Shortcuts.IndexOf(source);
-        var targetIndex = Shortcuts.IndexOf(target);
+        var sourceIndex = GetShortcutIndex(source);
+        var targetIndex = GetShortcutIndex(target);
         if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex)
         {
             return;
         }
 
-        Shortcuts.Move(sourceIndex, targetIndex);
+        await MoveShortcutToIndexAsync(source, targetIndex);
+    }
 
-        var sourceDisplayIndex = ShortcutDisplayEntries.IndexOf(source);
-        var targetDisplayIndex = ShortcutDisplayEntries.IndexOf(target);
-        if (sourceDisplayIndex >= 0 && targetDisplayIndex >= 0)
+    private int GetShortcutIndex(ShortcutItem? shortcut)
+    {
+        if (shortcut == null)
         {
-            ShortcutDisplayEntries.Move(sourceDisplayIndex, targetDisplayIndex);
+            return -1;
         }
 
-        await _shortcutService.UpdateSortOrderAsync(Shortcuts.Select(s => s.Id).ToList());
+        return _allShortcuts.FindIndex(item => item.Id == shortcut.Id);
+    }
+
+    private async Task MoveShortcutToIndexAsync(ShortcutItem? shortcut, int targetIndex)
+    {
+        var sourceIndex = GetShortcutIndex(shortcut);
+        if (shortcut == null || sourceIndex < 0)
+        {
+            return;
+        }
+
+        targetIndex = Math.Clamp(targetIndex, 0, _allShortcuts.Count - 1);
+        if (sourceIndex == targetIndex)
+        {
+            return;
+        }
+
+        var ordered = _allShortcuts.ToList();
+        ordered.RemoveAt(sourceIndex);
+        ordered.Insert(targetIndex, shortcut);
+        await ApplyShortcutOrderAsync(ordered);
+    }
+
+    private async Task ApplyShortcutOrderAsync(List<ShortcutItem> orderedShortcuts)
+    {
+        for (var i = 0; i < orderedShortcuts.Count; i++)
+        {
+            orderedShortcuts[i].SortOrder = i;
+        }
+
+        _allShortcuts = orderedShortcuts;
+        RefreshVisibleShortcuts();
+        await _shortcutService.UpdateSortOrderAsync(_allShortcuts.Select(shortcut => shortcut.Id).ToList());
+        NotifyShortcutOrderCommandsCanExecuteChanged();
+    }
+
+    private void NotifyShortcutOrderCommandsCanExecuteChanged()
+    {
+        MoveShortcutUpCommand.NotifyCanExecuteChanged();
+        MoveShortcutDownCommand.NotifyCanExecuteChanged();
+        MoveShortcutToFirstCommand.NotifyCanExecuteChanged();
+        MoveShortcutToLastCommand.NotifyCanExecuteChanged();
     }
 
     private async Task LoadShortcutsAsync()
@@ -1576,18 +1704,18 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         var generation = Interlocked.Increment(ref _shortcutsLoadGeneration);
         try
         {
+            await _shortcutService.NormalizeSortOrderAsync();
             var shortcuts = await _shortcutService.GetAllShortcutsAsync();
             if (generation != _shortcutsLoadGeneration) return;
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                Shortcuts.Clear();
-                foreach (var shortcut in shortcuts.OrderBy(s => s.SortOrder).Take(GetShortcutMaxCount()))
-                {
-                    Shortcuts.Add(shortcut);
-                }
-
-                RefreshShortcutDisplayEntries();
+                _allShortcuts = shortcuts
+                    .OrderBy(shortcut => shortcut.SortOrder)
+                    .ThenBy(shortcut => shortcut.CreatedAt)
+                    .ThenBy(shortcut => shortcut.Id)
+                    .ToList();
+                RefreshVisibleShortcuts();
             });
         }
         catch (Exception ex)

@@ -139,7 +139,6 @@ public class DatabaseService : IDatabaseService
                 CreatedAt TEXT NOT NULL,
                 LaunchArguments TEXT
             )",
-            "CREATE INDEX IF NOT EXISTS idx_shortcuts_sort_order ON Shortcuts(SortOrder)",
             @"
             CREATE TABLE IF NOT EXISTS Settings (
                 Key TEXT PRIMARY KEY,
@@ -154,6 +153,7 @@ public class DatabaseService : IDatabaseService
             await command.ExecuteNonQueryAsync();
         }
 
+        await EnsureShortcutsTableAsync(connection);
         await InitializeDefaultSettingsAsync(connection);
     }
 
@@ -234,11 +234,35 @@ public class DatabaseService : IDatabaseService
     private async Task EnsureSchemaUpdatesAsync(SqliteConnection connection)
     {
         await TryAddColumnAsync(connection, "Todos", "Priority", "INTEGER NOT NULL DEFAULT 1");
-        await TryAddColumnAsync(connection, "Shortcuts", "LaunchArguments", "TEXT");
+        await EnsureShortcutsTableAsync(connection);
         await EnsureQuickNotesTableAsync(connection);
         await EnsureQuickTextTablesAsync(connection);
         await EnsureQuickTextSettingsAsync(connection);
         await EnsureEncryptedWeatherDefaultsAsync(connection);
+    }
+
+    private static async Task EnsureShortcutsTableAsync(SqliteConnection connection)
+    {
+        var create = connection.CreateCommand();
+        create.CommandText = @"
+            CREATE TABLE IF NOT EXISTS Shortcuts (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL,
+                Path TEXT NOT NULL,
+                Type TEXT NOT NULL DEFAULT 'Application',
+                IconPath TEXT,
+                SortOrder INTEGER NOT NULL DEFAULT 0,
+                CreatedAt TEXT NOT NULL,
+                LaunchArguments TEXT
+            )";
+        await create.ExecuteNonQueryAsync();
+
+        await TryAddColumnAsync(connection, "Shortcuts", "SortOrder", "INTEGER NOT NULL DEFAULT 0");
+        await TryAddColumnAsync(connection, "Shortcuts", "LaunchArguments", "TEXT");
+
+        var index = connection.CreateCommand();
+        index.CommandText = "CREATE INDEX IF NOT EXISTS idx_shortcuts_sort_order ON Shortcuts(SortOrder)";
+        await index.ExecuteNonQueryAsync();
     }
 
     private static async Task EnsureQuickNotesTableAsync(SqliteConnection connection)
@@ -357,10 +381,12 @@ public class DatabaseService : IDatabaseService
         var check = connection.CreateCommand();
         check.CommandText = $"PRAGMA table_info({table})";
         var hasColumn = false;
+        var tableExists = false;
         await using (var reader = await check.ExecuteReaderAsync())
         {
             while (await reader.ReadAsync())
             {
+                tableExists = true;
                 if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
                 {
                     hasColumn = true;
@@ -369,7 +395,7 @@ public class DatabaseService : IDatabaseService
             }
         }
 
-        if (hasColumn) return;
+        if (!tableExists || hasColumn) return;
 
         var alter = connection.CreateCommand();
         alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";

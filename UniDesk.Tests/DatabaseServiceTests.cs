@@ -1,6 +1,7 @@
 using Xunit;
 using UniDesk.Services;
 using UniDesk.Helpers;
+using Microsoft.Data.Sqlite;
 
 namespace UniDesk.Tests;
 
@@ -192,6 +193,60 @@ public class DatabaseServiceTests
         );
 
         Assert.Equal(1, result);
+
+        Cleanup();
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldAddSortOrderToExistingShortcutsTable()
+    {
+        Cleanup();
+
+        await using (var connection = new SqliteConnection($"Data Source={_testDbFile}"))
+        {
+            await connection.OpenAsync();
+
+            var createSettings = connection.CreateCommand();
+            createSettings.CommandText = "CREATE TABLE Settings (Key TEXT PRIMARY KEY, Value TEXT)";
+            await createSettings.ExecuteNonQueryAsync();
+
+            var version = connection.CreateCommand();
+            version.CommandText = "INSERT INTO Settings (Key, Value) VALUES ('DatabaseVersion', '1.5')";
+            await version.ExecuteNonQueryAsync();
+
+            var createShortcuts = connection.CreateCommand();
+            createShortcuts.CommandText = @"
+                CREATE TABLE Shortcuts (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name TEXT NOT NULL,
+                    Path TEXT NOT NULL,
+                    Type TEXT NOT NULL DEFAULT 'Application',
+                    IconPath TEXT,
+                    CreatedAt TEXT NOT NULL
+                )";
+            await createShortcuts.ExecuteNonQueryAsync();
+
+            var insertShortcut = connection.CreateCommand();
+            insertShortcut.CommandText = "INSERT INTO Shortcuts (Name, Path, Type, CreatedAt) VALUES ('App', 'path', 'Application', @createdAt)";
+            insertShortcut.Parameters.AddWithValue("@createdAt", DateTime.UtcNow.ToString("o"));
+            await insertShortcut.ExecuteNonQueryAsync();
+        }
+
+        var databaseService = GetService();
+        await databaseService.InitializeAsync();
+
+        var columns = await databaseService.QueryAsync(
+            "PRAGMA table_info(Shortcuts)",
+            reader => reader.GetString(1)
+        );
+        var sortOrder = await databaseService.QuerySingleAsync<int>(
+            "SELECT SortOrder FROM Shortcuts WHERE Name = 'App'",
+            reader => reader.GetInt32(0)
+        );
+
+        Assert.Contains("SortOrder", columns);
+        Assert.Contains("LaunchArguments", columns);
+        Assert.Equal(0, sortOrder);
 
         Cleanup();
     }

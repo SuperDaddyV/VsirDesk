@@ -93,7 +93,7 @@ UniDesk 基于 [Happyeveryweek/LumiDesk](https://github.com/Happyeveryweek/LumiD
 从 [GitHub Releases](https://github.com/SuperDaddyV/UniDesk/releases/latest) 下载最新安装包并运行：
 
 ```powershell
-UniDesk_Setup_1.3.1.exe
+UniDesk_Setup_1.3.2.exe
 ```
 
 系统要求：

@@ -10,5 +10,6 @@ public interface IShortcutService
     Task UpdateShortcutAsync(ShortcutItem shortcut);
     Task DeleteShortcutAsync(int id);
     Task UpdateSortOrderAsync(List<int> ids);
+    Task NormalizeSortOrderAsync();
     Task LaunchShortcutAsync(int id);
 }

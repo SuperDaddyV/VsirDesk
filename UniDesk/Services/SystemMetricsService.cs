@@ -1,4 +1,5 @@
 using UniDesk.Models;
+using LibreHardwareMonitor.Hardware;
 using System.Diagnostics;
 using System.IO;
 using System.Net.NetworkInformation;
@@ -12,6 +13,8 @@ public sealed class SystemMetricsService : ISystemMetricsService, IDisposable
     private readonly PerformanceCounter _cpuCounter = new("Processor", "% Processor Time", "_Total");
     private readonly AsusHardwareReader _asusReader = new();
     private readonly AmdAdlReader _amdReader = new();
+    private readonly NvidiaNvmlReader _nvidiaReader = new();
+    private readonly LibreHardwareGpuReader _libreHardwareReader = new();
     private readonly NetworkSpeedReader _networkReader = new();
     private bool _disposed;
 
@@ -22,18 +25,34 @@ public sealed class SystemMetricsService : ISystemMetricsService, IDisposable
 
     public SystemMetricsSnapshot Read()
     {
-        var amd = _amdReader.Read();
+        var gpu = ReadGpuMetrics();
         var network = _networkReader.Read();
         return new SystemMetricsSnapshot
         {
             CpuUsage = SafeValue(() => _cpuCounter.NextValue()),
             CpuTemperature = _asusReader.ReadCpuPackageTemperature(),
             MemoryUsage = ReadMemoryUsage(),
-            GpuUsage = amd.GpuUsage,
-            GpuTemperature = amd.GpuTemperature,
+            GpuUsage = gpu.GpuUsage,
+            GpuTemperature = gpu.GpuTemperature,
             NetworkReceivedBytesPerSecond = network.ReceivedBytesPerSecond,
             NetworkSentBytesPerSecond = network.SentBytesPerSecond
         };
+    }
+
+    private GpuMetrics ReadGpuMetrics()
+    {
+        var gpu = _amdReader.Read();
+        if (!gpu.HasAllValues)
+        {
+            gpu = gpu.WithFallback(_nvidiaReader.Read());
+        }
+
+        if (!gpu.HasAllValues)
+        {
+            gpu = gpu.WithFallback(_libreHardwareReader.Read());
+        }
+
+        return gpu;
     }
 
     private static double? SafeValue(Func<float> read)
@@ -62,6 +81,8 @@ public sealed class SystemMetricsService : ISystemMetricsService, IDisposable
         if (_disposed) return;
         _disposed = true;
         _cpuCounter.Dispose();
+        _nvidiaReader.Dispose();
+        _libreHardwareReader.Dispose();
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -191,12 +212,12 @@ public sealed class SystemMetricsService : ISystemMetricsService, IDisposable
         private bool _initialized;
         private IntPtr _context = IntPtr.Zero;
 
-        public AmdMetrics Read()
+        public GpuMetrics Read()
         {
             try
             {
-                if (!EnsureInitialized()) return AmdMetrics.Empty;
-                if (ADL2_Adapter_NumberOfAdapters_Get(_context, out var count) != 0 || count <= 0) return AmdMetrics.Empty;
+                if (!EnsureInitialized()) return GpuMetrics.Empty;
+                if (ADL2_Adapter_NumberOfAdapters_Get(_context, out var count) != 0 || count <= 0) return GpuMetrics.Empty;
 
                 var size = Marshal.SizeOf<AdapterInfo>();
                 var ptr = Marshal.AllocHGlobal(size * count);
@@ -207,7 +228,7 @@ public sealed class SystemMetricsService : ISystemMetricsService, IDisposable
                         Marshal.StructureToPtr(new AdapterInfo { iSize = size }, IntPtr.Add(ptr, i * size), false);
                     }
 
-                    if (ADL2_Adapter_AdapterInfo_Get(_context, ptr, size * count) != 0) return AmdMetrics.Empty;
+                    if (ADL2_Adapter_AdapterInfo_Get(_context, ptr, size * count) != 0) return GpuMetrics.Empty;
 
                     for (var i = 0; i < count; i++)
                     {
@@ -236,7 +257,7 @@ public sealed class SystemMetricsService : ISystemMetricsService, IDisposable
                         if (data.sensors[SensorGpuActivity].supported != 0)
                             usage = Clamp(data.sensors[SensorGpuActivity].value, 0, 100);
 
-                        if (temp.HasValue || usage.HasValue) return new AmdMetrics(usage, temp);
+                        if (temp.HasValue || usage.HasValue) return new GpuMetrics(usage, temp);
                     }
                 }
                 finally
@@ -248,7 +269,7 @@ public sealed class SystemMetricsService : ISystemMetricsService, IDisposable
             {
             }
 
-            return AmdMetrics.Empty;
+            return GpuMetrics.Empty;
         }
 
         private bool EnsureInitialized()
@@ -321,11 +342,271 @@ public sealed class SystemMetricsService : ISystemMetricsService, IDisposable
         }
     }
 
-    private readonly struct AmdMetrics(double? gpuUsage, double? gpuTemperature)
+    private sealed class NvidiaNvmlReader : IDisposable
     {
-        public static readonly AmdMetrics Empty = new(null, null);
+        private const int NvmlSuccess = 0;
+        private const int NvmlTemperatureGpu = 0;
+        private bool _initialized;
+        private bool _available;
+
+        public GpuMetrics Read()
+        {
+            try
+            {
+                if (!EnsureInitialized()) return GpuMetrics.Empty;
+                if (nvmlDeviceGetCount_v2(out var count) != NvmlSuccess || count == 0) return GpuMetrics.Empty;
+
+                for (uint i = 0; i < count; i++)
+                {
+                    if (nvmlDeviceGetHandleByIndex_v2(i, out var device) != NvmlSuccess ||
+                        device == IntPtr.Zero)
+                    {
+                        continue;
+                    }
+
+                    double? temp = null;
+                    double? usage = null;
+
+                    if (nvmlDeviceGetTemperature(device, NvmlTemperatureGpu, out var rawTemp) == NvmlSuccess &&
+                        rawTemp > 0 && rawTemp < 130)
+                    {
+                        temp = rawTemp;
+                    }
+
+                    if (nvmlDeviceGetUtilizationRates(device, out var utilization) == NvmlSuccess)
+                    {
+                        usage = Clamp(utilization.gpu, 0, 100);
+                    }
+
+                    if (temp.HasValue || usage.HasValue)
+                    {
+                        return new GpuMetrics(usage, temp);
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return GpuMetrics.Empty;
+        }
+
+        private bool EnsureInitialized()
+        {
+            if (_initialized) return _available;
+            _initialized = true;
+
+            try
+            {
+                _available = nvmlInit_v2() == NvmlSuccess;
+            }
+            catch
+            {
+                _available = false;
+            }
+
+            return _available;
+        }
+
+        public void Dispose()
+        {
+            if (!_available) return;
+
+            try
+            {
+                nvmlShutdown();
+            }
+            catch
+            {
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NvmlUtilization
+        {
+            public uint gpu;
+            public uint memory;
+        }
+
+        [DllImport("nvml.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int nvmlInit_v2();
+
+        [DllImport("nvml.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int nvmlShutdown();
+
+        [DllImport("nvml.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int nvmlDeviceGetCount_v2(out uint deviceCount);
+
+        [DllImport("nvml.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int nvmlDeviceGetHandleByIndex_v2(uint index, out IntPtr device);
+
+        [DllImport("nvml.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int nvmlDeviceGetTemperature(IntPtr device, uint sensorType, out uint temp);
+
+        [DllImport("nvml.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int nvmlDeviceGetUtilizationRates(IntPtr device, out NvmlUtilization utilization);
+    }
+
+    private sealed class LibreHardwareGpuReader : IDisposable
+    {
+        private Computer? _computer;
+        private bool _initialized;
+
+        public GpuMetrics Read()
+        {
+            try
+            {
+                if (!EnsureInitialized() || _computer == null) return GpuMetrics.Empty;
+
+                foreach (var hardware in _computer.Hardware)
+                {
+                    if (!IsGpuHardware(hardware.HardwareType))
+                    {
+                        continue;
+                    }
+
+                    hardware.Update();
+                    foreach (var subHardware in hardware.SubHardware)
+                    {
+                        subHardware.Update();
+                    }
+
+                    var metrics = ReadHardware(hardware);
+                    if (metrics.HasAnyValue)
+                    {
+                        return metrics;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return GpuMetrics.Empty;
+        }
+
+        private bool EnsureInitialized()
+        {
+            if (_initialized) return _computer != null;
+            _initialized = true;
+
+            try
+            {
+                _computer = new Computer
+                {
+                    IsGpuEnabled = true
+                };
+                _computer.Open();
+                return true;
+            }
+            catch
+            {
+                _computer = null;
+                return false;
+            }
+        }
+
+        private static GpuMetrics ReadHardware(IHardware hardware)
+        {
+            double? temp = null;
+            double? usage = null;
+
+            foreach (var sensor in GetSensors(hardware))
+            {
+                if (!sensor.Value.HasValue)
+                {
+                    continue;
+                }
+
+                if (!temp.HasValue &&
+                    sensor.SensorType == SensorType.Temperature &&
+                    IsLikelyGpuTemperature(sensor.Name, sensor.Value.Value))
+                {
+                    temp = sensor.Value.Value;
+                }
+                else if (!usage.HasValue &&
+                         sensor.SensorType == SensorType.Load &&
+                         IsLikelyGpuLoad(sensor.Name, sensor.Value.Value))
+                {
+                    usage = Clamp(sensor.Value.Value, 0, 100);
+                }
+
+                if (temp.HasValue && usage.HasValue)
+                {
+                    break;
+                }
+            }
+
+            return new GpuMetrics(usage, temp);
+        }
+
+        private static IEnumerable<ISensor> GetSensors(IHardware hardware)
+        {
+            foreach (var sensor in hardware.Sensors)
+            {
+                yield return sensor;
+            }
+
+            foreach (var subHardware in hardware.SubHardware)
+            {
+                foreach (var sensor in subHardware.Sensors)
+                {
+                    yield return sensor;
+                }
+            }
+        }
+
+        private static bool IsGpuHardware(HardwareType type) =>
+            type is HardwareType.GpuAmd or HardwareType.GpuNvidia or HardwareType.GpuIntel;
+
+        private static bool IsLikelyGpuTemperature(string name, double value)
+        {
+            if (value <= 0 || value >= 130) return false;
+
+            if (name.Contains("Hot Spot", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Junction", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Memory", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return name.Contains("GPU", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("Core", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("Temperature", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsLikelyGpuLoad(string name, double value)
+        {
+            if (value < 0 || value > 100) return false;
+
+            return name.Contains("GPU Core", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("GPU", StringComparison.OrdinalIgnoreCase) ||
+                   name.Equals("Core", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                _computer?.Close();
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private readonly struct GpuMetrics(double? gpuUsage, double? gpuTemperature)
+    {
+        public static readonly GpuMetrics Empty = new(null, null);
         public double? GpuUsage { get; } = gpuUsage;
         public double? GpuTemperature { get; } = gpuTemperature;
+        public bool HasAnyValue => GpuUsage.HasValue || GpuTemperature.HasValue;
+        public bool HasAllValues => GpuUsage.HasValue && GpuTemperature.HasValue;
+
+        public GpuMetrics WithFallback(GpuMetrics fallback) => new(
+            GpuUsage ?? fallback.GpuUsage,
+            GpuTemperature ?? fallback.GpuTemperature);
     }
 
     private sealed class NetworkSpeedReader

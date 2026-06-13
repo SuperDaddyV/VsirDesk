@@ -23,10 +23,17 @@ public class ShortcutService : IShortcutService
     {
         try
         {
-            return await _databaseService.QueryAsync(
-                $"{ShortcutSelectSql} ORDER BY SortOrder ASC",
+            var shortcuts = await _databaseService.QueryAsync(
+                $"{ShortcutSelectSql} ORDER BY SortOrder ASC, CreatedAt ASC, Id ASC",
                 MapShortcut
             );
+
+            if (NeedsSortOrderRepair(shortcuts))
+            {
+                await SaveSortOrderAsync(shortcuts);
+            }
+
+            return shortcuts;
         }
         catch
         {
@@ -132,12 +139,25 @@ public class ShortcutService : IShortcutService
     {
         try
         {
-            for (int i = 0; i < ids.Count; i++)
+            await SaveSortOrderAsync(ids);
+        }
+        catch
+        {
+        }
+    }
+
+    public async Task NormalizeSortOrderAsync()
+    {
+        try
+        {
+            var shortcuts = await _databaseService.QueryAsync(
+                $"{ShortcutSelectSql} ORDER BY SortOrder ASC, CreatedAt ASC, Id ASC",
+                MapShortcut
+            );
+
+            if (NeedsSortOrderRepair(shortcuts))
             {
-                await _databaseService.ExecuteNonQueryAsync(
-                    "UPDATE Shortcuts SET SortOrder = @p0 WHERE Id = @p1",
-                    i, ids[i]
-                );
+                await SaveSortOrderAsync(shortcuts);
             }
         }
         catch
@@ -266,6 +286,43 @@ public class ShortcutService : IShortcutService
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr hIcon);
+
+    private static bool NeedsSortOrderRepair(IReadOnlyList<ShortcutItem> shortcuts)
+    {
+        var seen = new HashSet<int>();
+        for (var i = 0; i < shortcuts.Count; i++)
+        {
+            var order = shortcuts[i].SortOrder;
+            if (order != i || order < 0 || !seen.Add(order))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task SaveSortOrderAsync(IReadOnlyList<ShortcutItem> shortcuts)
+    {
+        for (var i = 0; i < shortcuts.Count; i++)
+        {
+            shortcuts[i].SortOrder = i;
+        }
+
+        await SaveSortOrderAsync(shortcuts.Select(shortcut => shortcut.Id).ToList());
+    }
+
+    private async Task SaveSortOrderAsync(IReadOnlyList<int> ids)
+    {
+        for (var i = 0; i < ids.Count; i++)
+        {
+            await _databaseService.ExecuteNonQueryAsync(
+                "UPDATE Shortcuts SET SortOrder = @p0 WHERE Id = @p1",
+                i,
+                ids[i]
+            );
+        }
+    }
 
     private static ShortcutItem MapShortcut(Microsoft.Data.Sqlite.SqliteDataReader reader)
     {

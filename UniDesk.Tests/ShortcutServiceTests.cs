@@ -82,6 +82,26 @@ public class ShortcutServiceTests
     }
 
     [Fact]
+    public async Task GetAllShortcutsAsync_ShouldNormalizeDuplicateSortOrders()
+    {
+        var (db, svc) = await InitAsync();
+
+        var id1 = await svc.CreateShortcutAsync(new ShortcutItem { Name = "App 1", Path = "path1", SortOrder = 0 });
+        var id2 = await svc.CreateShortcutAsync(new ShortcutItem { Name = "App 2", Path = "path2", SortOrder = 0 });
+        var id3 = await svc.CreateShortcutAsync(new ShortcutItem { Name = "App 3", Path = "path3", SortOrder = 0 });
+
+        var shortcuts = await svc.GetAllShortcutsAsync();
+
+        Assert.Equal(new[] { id1, id2, id3 }, shortcuts.Select(shortcut => shortcut.Id).ToArray());
+        Assert.Equal(new[] { 0, 1, 2 }, shortcuts.Select(shortcut => shortcut.SortOrder).ToArray());
+
+        var fetched = await svc.GetAllShortcutsAsync();
+        Assert.Equal(new[] { 0, 1, 2 }, fetched.Select(shortcut => shortcut.SortOrder).ToArray());
+
+        Cleanup();
+    }
+
+    [Fact]
     public async Task DeleteShortcutAsync_ShouldRemoveShortcut()
     {
         var (db, svc) = await InitAsync();

@@ -144,18 +144,25 @@
                     </Grid>
                 </Border>
 
-                <Grid x:Name="MainModulesGrid"
-                      Grid.Row="1"
-                      Margin="12,0,12,10"
-                      ClipToBounds="True">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="24*"/>
-                        <RowDefinition Height="16*"/>
-                        <RowDefinition Height="26*"/>
-                        <RowDefinition Height="34*"/>
-                        <RowDefinition Height="28*"/>
-                        <RowDefinition Height="28*"/>
-                    </Grid.RowDefinitions>
+                <ScrollViewer x:Name="MainModulesScrollViewer"
+                              Grid.Row="1"
+                              Margin="12,0,12,10"
+                              ClipToBounds="True"
+                              VerticalScrollBarVisibility="Hidden"
+                              HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="False"
+                              PanningMode="None"
+                              MouseWheel="OnScrollViewerPreviewMouseWheel">
+                    <Grid x:Name="MainModulesGrid"
+                          ClipToBounds="False">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
 
                         <Border x:Name="TimeWeatherModule"
                                 Grid.Row="0"
@@ -621,6 +628,7 @@
                                 Grid.Row="1"
                                 Style="{StaticResource ModuleCardStyle}"
                                 Margin="0,0,0,6"
+                                MinHeight="122"
                                 Padding="13,8"
                                 ClipToBounds="True">
                             <Grid>
@@ -795,6 +803,12 @@
                                         <TextBlock Text="快捷方式" Style="{StaticResource ModuleHeaderTextStyle}" FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=12}"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBlock Text="拖动图标调整顺序"
+                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                   FontSize="{Binding FontScale, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"
+                                                   Visibility="{Binding IsEditingShortcuts, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                         <Button FontSize="10"
                                                 Command="{Binding ToggleShortcutEditCommand}">
                                             <Button.Style>
@@ -840,12 +854,32 @@
                                         <DataTemplate DataType="{x:Type models:ShortcutItem}">
                                             <Grid Height="64"
                                                   Margin="0,0,0,2"
+                                                  Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   AllowDrop="True"
                                                   PreviewMouseLeftButtonDown="ShortcutItem_OnPreviewMouseLeftButtonDown"
                                                   PreviewMouseLeftButtonUp="ShortcutItem_OnPreviewMouseLeftButtonUp"
                                                   PreviewMouseMove="ShortcutItem_OnPreviewMouseMove"
+                                                  DragEnter="ShortcutItem_OnDragEnter"
                                                   DragOver="ShortcutItem_OnDragOver"
+                                                  DragLeave="ShortcutItem_OnDragLeave"
                                                   Drop="ShortcutItem_OnDrop">
+                                                <Grid.ContextMenu>
+                                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                                        <MenuItem Header="上移"
+                                                                  Command="{Binding PlacementTarget.Tag.MoveShortcutUpCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                  CommandParameter="{Binding}"/>
+                                                        <MenuItem Header="下移"
+                                                                  Command="{Binding PlacementTarget.Tag.MoveShortcutDownCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                  CommandParameter="{Binding}"/>
+                                                        <Separator/>
+                                                        <MenuItem Header="移到最前"
+                                                                  Command="{Binding PlacementTarget.Tag.MoveShortcutToFirstCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                  CommandParameter="{Binding}"/>
+                                                        <MenuItem Header="移到最后"
+                                                                  Command="{Binding PlacementTarget.Tag.MoveShortcutToLastCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                                  CommandParameter="{Binding}"/>
+                                                    </ContextMenu>
+                                                </Grid.ContextMenu>
                                                 <StackPanel Orientation="Horizontal"
                                                             HorizontalAlignment="Center"
                                                             VerticalAlignment="Top">
@@ -1663,7 +1697,8 @@
                                    HorizontalAlignment="Center"
                                    Margin="20"
                                    Visibility="Collapsed"/>
-                </Grid>
+                    </Grid>
+                </ScrollViewer>
             </Grid>
         </Border>
     </Grid>

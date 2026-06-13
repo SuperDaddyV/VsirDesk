@@ -17,6 +17,8 @@ public partial class MainWindow : Window
     private readonly IClipboardMonitorService _clipboardMonitorService;
     private Point _shortcutDragStart;
     private ShortcutItem? _draggedShortcut;
+    private FrameworkElement? _shortcutDragSourceElement;
+    private FrameworkElement? _shortcutDragTargetElement;
     private Point _scrollPanStart;
     private double _scrollPanOffsetStart;
     private bool _scrollPanPending;
@@ -80,17 +82,17 @@ public partial class MainWindow : Window
 
         if (_viewModel.IsPanelCollapsed)
         {
-            MainModulesGrid.Margin = new Thickness(12, 0, 12, 6);
+            MainModulesScrollViewer.Margin = new Thickness(12, 0, 12, 6);
             foreach (var row in MainModulesGrid.RowDefinitions)
             {
                 row.Height = new GridLength(0);
             }
 
-            MainModulesGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+            MainModulesGrid.RowDefinitions[0].Height = GridLength.Auto;
         }
         else
         {
-            MainModulesGrid.Margin = new Thickness(12, 0, 12, 10);
+            MainModulesScrollViewer.Margin = new Thickness(12, 0, 12, 10);
         }
 
         ApplyModuleLayout();
@@ -155,8 +157,7 @@ public partial class MainWindow : Window
             .Select(module => new
             {
                 module.ModuleId,
-                Element = GetModuleElement(module.ModuleId),
-                Weight = GetModuleWeight(module.ModuleId)
+                Element = GetModuleElement(module.ModuleId)
             })
             .Where(module => module.Element != null)
             .ToList();
@@ -185,9 +186,7 @@ public partial class MainWindow : Window
                 ? new Thickness(0)
                 : new Thickness(0, 0, 0, 6);
 
-            MainModulesGrid.RowDefinitions[row].Height = _viewModel.IsPanelCollapsed
-                ? new GridLength(1, GridUnitType.Star)
-                : new GridLength(module.Weight, GridUnitType.Star);
+            MainModulesGrid.RowDefinitions[row].Height = GridLength.Auto;
         }
 
         EmptyModulesMessage.Visibility = modules.Count == 0
@@ -196,7 +195,7 @@ public partial class MainWindow : Window
 
         if (modules.Count == 0)
         {
-            MainModulesGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+            MainModulesGrid.RowDefinitions[0].Height = GridLength.Auto;
         }
     }
 
@@ -220,17 +219,6 @@ public partial class MainWindow : Window
         yield return QuickNotesModule;
         yield return QuickTextModule;
     }
-
-    private static double GetModuleWeight(string moduleId) => moduleId switch
-    {
-        DashboardModuleIds.TimeWeather => 24,
-        DashboardModuleIds.HardwareMonitor => 16,
-        DashboardModuleIds.Shortcuts => 26,
-        DashboardModuleIds.Todos => 34,
-        DashboardModuleIds.QuickNotes => 28,
-        DashboardModuleIds.QuickText => 28,
-        _ => 20
-    };
 
     private void WindowContainer_OnSizeChanged(object sender, SizeChangedEventArgs e) =>
         UpdateWindowContainerClip();
@@ -451,6 +439,7 @@ public partial class MainWindow : Window
         }
 
         _draggedShortcut = null;
+        ClearShortcutDragVisuals();
     }
 
     private void ShortcutItem_OnPreviewMouseMove(object sender, MouseEventArgs e)
@@ -471,13 +460,37 @@ public partial class MainWindow : Window
 
         var data = new DataObject(typeof(ShortcutItem), _draggedShortcut);
         _draggedShortcut = null;
+        _shortcutDragSourceElement = sender as FrameworkElement;
+        if (_shortcutDragSourceElement != null)
+        {
+            _shortcutDragSourceElement.Opacity = 0.55;
+        }
+
         if (sender is UIElement element && element.IsMouseCaptured)
         {
             element.ReleaseMouseCapture();
         }
 
-        DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Move);
+        try
+        {
+            DragDrop.DoDragDrop((DependencyObject)sender, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            ClearShortcutDragVisuals();
+        }
+
         e.Handled = true;
+    }
+
+    private void ShortcutItem_OnDragEnter(object sender, DragEventArgs e)
+    {
+        if (!_viewModel.IsEditingShortcuts || !e.Data.GetDataPresent(typeof(ShortcutItem)))
+        {
+            return;
+        }
+
+        SetShortcutDragTarget(sender as FrameworkElement);
     }
 
     private void ShortcutItem_OnDragOver(object sender, DragEventArgs e)
@@ -490,8 +503,49 @@ public partial class MainWindow : Window
         if (e.Data.GetDataPresent(typeof(ShortcutItem)))
         {
             e.Effects = DragDropEffects.Move;
+            SetShortcutDragTarget(sender as FrameworkElement);
             e.Handled = true;
         }
+    }
+
+    private void ShortcutItem_OnDragLeave(object sender, DragEventArgs e)
+    {
+        if (ReferenceEquals(sender, _shortcutDragTargetElement))
+        {
+            SetShortcutDragTarget(null);
+        }
+    }
+
+    private void SetShortcutDragTarget(FrameworkElement? target)
+    {
+        if (_shortcutDragTargetElement != null &&
+            !ReferenceEquals(_shortcutDragTargetElement, _shortcutDragSourceElement))
+        {
+            _shortcutDragTargetElement.Opacity = 1;
+        }
+
+        _shortcutDragTargetElement = target;
+        if (_shortcutDragTargetElement != null &&
+            !ReferenceEquals(_shortcutDragTargetElement, _shortcutDragSourceElement))
+        {
+            _shortcutDragTargetElement.Opacity = 0.78;
+        }
+    }
+
+    private void ClearShortcutDragVisuals()
+    {
+        if (_shortcutDragSourceElement != null)
+        {
+            _shortcutDragSourceElement.Opacity = 1;
+        }
+
+        if (_shortcutDragTargetElement != null)
+        {
+            _shortcutDragTargetElement.Opacity = 1;
+        }
+
+        _shortcutDragSourceElement = null;
+        _shortcutDragTargetElement = null;
     }
 
     private void Window_OnPreviewDragEnter(object sender, DragEventArgs e) =>
