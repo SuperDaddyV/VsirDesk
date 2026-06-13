@@ -1,177 +1,184 @@
 # UniDesk
 
-<p align="center">
-  <img src="images/unidesk-hero.png" alt="UniDesk hero" width="900">
-</p>
+UniDesk 是一个轻量、个性化、清爽好用的 Windows 桌面侧边栏工具，把时间天气、硬件监视、快捷方式、待办事项、快速便签和快捷文本整合进一个顺手的桌面工作台。
 
-<p align="center">
-  <b>A lightweight Windows desktop sidebar for time, weather, hardware status, shortcuts, todos, and personal desktop workflows.</b>
-</p>
+![UniDesk 产品展示图](images/unidesk-hero.png)
 
-<p align="center">
-  English | <a href="README.zh-CN.md">简体中文</a>
-</p>
+## ✨ 主要特性
 
-<p align="center">
-  <a href="#about">About</a> ·
-  <a href="#credits">Credits</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#screenshots">Screenshots</a> ·
-  <a href="#install">Install</a> ·
-  <a href="#build">Build</a>
-</p>
+### 时间天气
 
-## About
+- 显示当前时间、日期和农历信息。
+- 显示天气、温度、空气质量、湿度和城市信息。
+- 内置桌面日历，方便快速查看公历和农历日期。
 
-UniDesk is a compact desktop sidebar for Windows. It stays on the edge of your desktop and keeps daily information, quick actions, lightweight hardware status, and todo items in one themeable panel.
+### 硬件监视
 
-The goal is to provide a calm personal desktop center: always visible when needed, easy to collapse when not needed, flexible enough for different screen sizes, and simple enough to run as a daily utility.
+- 实时查看 CPU、内存、GPU 使用率。
+- 显示 CPU / GPU 温度。
+- 显示整机网络上传 / 下载速度。
+- GPU 温度会尽量从可用驱动和硬件监视来源读取；无法读取时会安全显示为 `--`。
 
-## Credits
+### 快捷方式
 
-UniDesk is developed based on [Happyeveryweek/LumiDesk](https://github.com/Happyeveryweek/LumiDesk). Thanks to the original author for the idea, foundation, and implementation of the desktop widget experience.
+- 支持添加常用应用、文件和文件夹。
+- 支持从桌面或资源管理器拖拽添加。
+- 支持快捷方式自由排序。
+- 支持自定义主面板快捷方式显示数量。
 
-This project keeps the spirit of LumiDesk while adding project rebranding, integrated hardware monitoring, network speed display, updated layout, panel personalization, bilingual documentation, and installer packaging.
+### 待办事项
 
-## Features
+- 支持新增、编辑、完成和删除待办。
+- 支持任务时间和优先级显示。
+- 数据本地保存，适合日常事项记录。
 
-- **Time & Weather**: clock, date, lunar date, weather, humidity, air quality, and temperature range.
-- **Hardware Monitor**: CPU, memory, GPU, temperature, and real-time network RX/TX speed.
-- **Quick Shortcuts**: pin apps, folders, and files for one-click access.
-- **Todo List**: manage tasks with priority, due date, completion state, backup, and restore.
-- **Built-in Calendar**: open a desktop calendar panel with solar and lunar dates.
-- **Personalized Panel**: adjust display title, theme colors, transparency, width, height, font size, topmost, lock, collapse, and shortcut count.
-- **Weather API Settings**: configure weather API host and key from the settings panel.
-- **Local-first Data**: settings, shortcuts, and todos are stored locally.
+### 快速便签
 
-## Screenshots
+- 支持多条便签。
+- 支持自动保存、置顶、复制和删除。
+- 适合临时记录灵感、草稿、会议记录和备忘内容。
 
-### Main Panel
+### 快捷文本
 
-<p align="center">
-  <img src="images/unidesk-main-panel.png" alt="UniDesk main panel" width="360">
-</p>
+- 支持剪贴板历史。
+- 支持常用短语。
+- 支持一键复制。
+- 支持敏感内容过滤，尽量避免保存验证码、密码、Token、Cookie 等敏感文本。
 
-### Personalization Settings
+### 模块管理
 
-<p align="center">
-  <img src="images/unidesk-settings-panel.png" alt="UniDesk personalization settings" width="360">
-</p>
+- 支持模块显示 / 隐藏。
+- 支持模块自由排序。
+- 可以按自己的使用习惯组合桌面面板。
 
-### System & Weather API Settings
+### 个性化设置
 
-<p align="center">
-  <img src="images/unidesk-settings-system.png" alt="UniDesk system and weather API settings" width="360">
-</p>
+- 支持主题配色、窗口透明度、面板宽度、面板高度和字体大小调节。
+- 支持自定义顶部显示名称。
+- 支持置顶、锁定、收起、开机自启和快捷方式数量设置。
+- 支持恢复默认布局和恢复默认设置。
 
-### Calendar
+### 数据备份与还原
 
-<p align="center">
-  <img src="images/unidesk-calendar-panel.png" alt="UniDesk calendar panel" width="860">
-</p>
+- 支持本地数据备份。
+- 支持待办事项、快速便签、剪贴板历史和常用短语还原。
+- 方便重装系统或迁移电脑后恢复常用数据。
 
-## Hardware Monitor
+## 🖼️ 界面预览
 
-The hardware monitor is integrated directly into the main UniDesk panel, between weather and shortcuts. It follows the same theme, transparency, width, and panel settings as the rest of the app.
+### 核心功能
 
-Data sources vary by device and installed drivers:
+![UniDesk 核心功能概览](images/unidesk-features.png)
 
-- CPU usage comes from Windows performance counters.
-- Memory usage comes from Windows system memory status.
-- CPU temperature is read from available hardware-monitoring providers when possible.
-- AMD GPU usage and temperature are read from available driver or vendor data when possible.
-- Network speed is calculated from active physical Ethernet and Wi-Fi adapters.
+### 个性化设置
 
-Some temperature fields may show `--` if the required driver, vendor component, or permission is unavailable.
+![UniDesk 个性化设置展示](images/unidesk-customization.png)
 
-## Location Note
+## 🚀 适合谁使用
 
-Auto location uses the current network exit IP. It usually works well on normal home networks, but VPNs, proxy tools, company networks, and carrier routing may return a different city. Users can switch to a manually selected city in settings when needed.
+UniDesk 适合希望桌面保持清爽，但又想快速查看信息、打开常用工具、记录待办和便签的 Windows 用户。
 
-## Install
+适合场景：
 
-Download the latest installer from [GitHub Releases](https://github.com/SuperDaddyV/UniDesk/releases/latest) and run:
+- 日常办公
+- 个人效率管理
+- 桌面快捷启动
+- 系统状态查看
+- 轻量待办与便签记录
+- 常用文本快速复制
+
+## 📦 安装与使用
+
+从 [GitHub Releases](https://github.com/SuperDaddyV/UniDesk/releases/latest) 下载最新安装包并运行。
+
+当前正式安装包示例：
 
 ```powershell
 UniDesk_Setup_1.3.2.exe
 ```
 
-System requirements:
+建议安装或升级前先退出正在运行的 UniDesk。
 
-- Windows 10 1903 or later
+系统要求：
+
+- Windows 10 1903 或更新版本
 - Windows 11
 
-## Build
+## 🛠️ 本地构建
 
-### Requirements
+环境要求：
 
-- Visual Studio 2022 or JetBrains Rider
 - .NET 9 SDK
-- Windows 10 v1903+ or Windows 11
-- Inno Setup 6, only required for building the installer
+- Windows 10 1903 或更新版本
+- Visual Studio 2022、JetBrains Rider，或其他支持 .NET / WPF 的开发环境
+- Inno Setup 6，仅制作安装包时需要
 
-### Compile and Run
+构建并运行：
 
 ```powershell
 git clone https://github.com/SuperDaddyV/UniDesk.git
 cd UniDesk
 
-dotnet restore
-dotnet build --configuration Release
-dotnet run --project UniDesk
+dotnet restore UniDesk.sln
+dotnet build UniDesk.sln -c Release
+dotnet run --project UniDesk\UniDesk.csproj
 ```
 
-### Publish
+发布应用：
 
 ```powershell
 dotnet publish .\UniDesk\UniDesk.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish\win-x64
 ```
 
-### Installer
+制作安装包：
 
 ```powershell
 ISCC.exe .\UniDesk.iss
 ```
 
-The installer is written to the `installer` directory.
+安装包会输出到 `installer` 目录。
 
-## Tech Stack
+## 🧰 技术栈
 
-| Technology | Usage |
+| 技术 | 用途 |
 | --- | --- |
-| .NET 9 | Runtime and base framework |
-| WPF | Windows desktop UI |
-| Wpf.Ui | Windows 11 style controls |
-| CommunityToolkit.Mvvm | MVVM helpers |
-| Microsoft.Data.Sqlite | Local data storage |
-| Hardcodet.NotifyIcon.Wpf | System tray icon |
-| Inno Setup | Windows installer |
+| .NET 9 | 应用运行框架 |
+| WPF | Windows 桌面界面 |
+| SQLite | 本地数据存储 |
+| CommunityToolkit.Mvvm | 界面与数据绑定辅助 |
+| LibreHardwareMonitorLib | 硬件信息读取 |
+| Hardcodet.NotifyIcon.Wpf | 系统托盘 |
+| Inno Setup | Windows 安装包 |
 
-## Project Structure
+## 🔐 数据与隐私
 
-```text
-UniDesk/
-├─ UniDesk/                # Main application
-│  ├─ Controls/            # Custom controls
-│  ├─ Helpers/             # Utility helpers
-│  ├─ Models/              # Data models
-│  ├─ Services/            # Business services
-│  ├─ ViewModels/          # MVVM view models
-│  ├─ Resources/           # Themes and resources
-│  └─ icon/                # App icons and bundled assets
-├─ UniDesk.Tests/          # Unit tests
-├─ docs/                   # Documentation
-├─ images/                 # README images
-├─ installer-assets/       # Installer language assets
-├─ installer/              # Generated installer output
-├─ UniDesk.iss             # Inno Setup script
-└─ README.md
-```
+UniDesk 优先使用本地存储，用户数据保存在本机。当前主要数据包括设置、快捷方式、待办事项、快速便签、快捷文本和图标缓存等。
 
-## Data Compatibility
+剪贴板历史功能带有敏感内容过滤，用于尽量避免保存验证码、密码、Token、Cookie 等敏感文本。该过滤用于降低误存风险，但不应被视为绝对安全保证；如果处理高敏感内容，建议关闭剪贴板历史或及时清理记录。
 
-UniDesk stores new user data under `%LOCALAPPDATA%\UniDesk`. On startup, it can copy compatible legacy local data into the new UniDesk data directory so existing settings, tasks, shortcuts, theme choices, and cache files are preserved where possible.
+## 🆕 更新亮点
 
-## License
+当前版本已补充以下能力：
 
-This project follows the repository license. Please also respect the license and copyright of the original [LumiDesk](https://github.com/Happyeveryweek/LumiDesk) project and its third-party dependencies.
+- 新增模块管理：支持模块显示 / 隐藏和排序。
+- 新增快捷方式拖拽添加与自由排序。
+- 新增快速便签：支持多条便签、自动保存、置顶和复制。
+- 新增快捷文本：支持剪贴板历史、常用短语和敏感内容过滤。
+- 优化硬件监视布局，完整显示 CPU、内存、GPU、温度和 RX / TX 网速。
+- 优化 GPU 温度读取，尽量兼容更多硬件与驱动环境。
+- 优化个性化设置和主面板滚动体验。
+
+## 📌 后续计划
+
+- 更多主题预设。
+- 更完善的硬件详情展示。
+- 更灵活的模块扩展能力。
+- 更好的安装与更新体验。
+
+## 🙏 致谢
+
+UniDesk 基于 [Happyeveryweek/LumiDesk](https://github.com/Happyeveryweek/LumiDesk) 开发。感谢原作者提供的创意、基础代码和桌面小工具体验。
+
+## 📄 License
+
+本项目遵循仓库中的 [MIT License](LICENSE)。请同时尊重原项目和第三方依赖的许可证与版权声明。

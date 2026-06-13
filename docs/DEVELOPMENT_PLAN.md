@@ -217,7 +217,7 @@
   - [ ] CommunityToolkit.Mvvm (MVVM 框架)
   - [ ] Microsoft.Data.Sqlite (SQLite 数据库)
   - [ ] Hardcodet.NotifyIcon.Wpf (系统托盘)
-  - [ ] Wpf.Ui (Win11 风格控件)
+  - [ ] System.Drawing.Common (图标和系统资源处理)
 
 - [ ] 配置内置库使用
   - [ ] System.Net.Http (HTTP 请求)

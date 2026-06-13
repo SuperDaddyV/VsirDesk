@@ -36,7 +36,7 @@ UniDesk 是运行于 Windows 11 的桌面侧边助手应用，以悬浮右侧面
 ### 支持平台
 - **目标平台**：Windows 11（及 Windows 10 v1903+）
 - **目标框架**：.NET 9
-- **UI 框架**：WPF + Wpf.Ui (Win11 风格控件)
+- **UI 框架**：WPF + 自定义样式资源
 
 ---
 
@@ -822,7 +822,7 @@ CREATE TABLE Settings (
 | CommunityToolkit.Mvvm | Latest | MVVM 框架 |
 | Microsoft.Data.Sqlite | Latest | SQLite 数据库 |
 | Hardcodet.NotifyIcon.Wpf | Latest | 系统托盘 |
-| Wpf.Ui | Latest | Win11 风格控件 |
+| System.Drawing.Common | Latest | 图标和系统资源处理 |
 | System.Net.Http | Latest | HTTP 请求 |
 
 ### 开发工具
