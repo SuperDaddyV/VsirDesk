@@ -1,5 +1,21 @@
 # UniDesk Release Notes
 
+## v1.3.4
+
+This patch release focuses on visual polish for the main panel.
+
+### Changes
+
+- Further reduced the empty bottom area in the Hardware Monitor module.
+- Kept hardware monitor content auto-sized while relying on the main panel scroll area when the overall panel is short.
+- Updated application, installer, and README version references to `1.3.4`.
+
+### 中文说明
+
+- 进一步减少「硬件监视」模块底部留白。
+- 保持硬件监视内容自适应高度，整体面板高度不足时继续由主面板滚动承接。
+- 将应用、安装包和 README 版本引用更新为 `1.3.4`。
+
 ## v1.3.3
 
 This release prepares the current main branch for a new public installer after the v1.3.2 release.
