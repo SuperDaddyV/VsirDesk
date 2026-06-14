@@ -1,5 +1,29 @@
 # UniDesk Release Notes
 
+## v1.3.5
+
+This patch release improves hardware monitor compatibility across CPU, memory, GPU, and network metrics.
+
+### Changes
+
+- Improved CPU temperature reading with LibreHardwareMonitor fallback for Intel and AMD processors.
+- Added Intel-friendly CPU temperature sensor selection for CPU Package, Package, Core Max, Core Average, CPU Core, and Core #n sensors.
+- Added CPU usage fallback selection from LibreHardwareMonitor load sensors when Windows performance counters are unavailable.
+- Improved GPU usage and temperature selection for NVIDIA, AMD, and Intel GPUs.
+- Added safer filtering for invalid sensor values such as null, NaN, Infinity, invalid percentages, and abnormal temperatures.
+- Improved memory metric validation and Debug-only diagnostic logs for hardware sensors.
+- Updated application, installer, and README version references to `1.3.5`.
+
+### 中文说明
+
+- 改进 CPU 温度读取，增加 LibreHardwareMonitor 兜底，兼容 Intel 和 AMD 处理器。
+- 增强 Intel CPU 温度传感器匹配，支持 CPU Package、Package、Core Max、Core Average、CPU Core 和 Core #n。
+- 当 Windows 性能计数器不可用时，增加 CPU 使用率传感器兜底选择。
+- 改进 NVIDIA、AMD、Intel GPU 的使用率和温度选择策略。
+- 统一过滤 null、NaN、Infinity、异常百分比和异常温度。
+- 改进内存指标校验，并增加 Debug 模式硬件传感器诊断日志。
+- 将应用、安装包和 README 版本引用更新为 `1.3.5`。
+
 ## v1.3.4
 
 This patch release focuses on visual polish for the main panel.

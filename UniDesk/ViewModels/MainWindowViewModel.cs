@@ -1900,10 +1900,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         catch
         {
             SystemCpuUsageText = "--";
-            SystemCpuTemperatureText = "CPU --";
+            SystemCpuTemperatureText = "CPU --℃";
             SystemMemoryUsageText = "--";
             SystemGpuUsageText = "--";
-            SystemGpuTemperatureText = "GPU --";
+            SystemGpuTemperatureText = "GPU --℃";
             SystemNetworkReceivedText = "--";
             SystemNetworkSentText = "--";
         }
@@ -1912,7 +1912,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private static string FormatPercent(double? value) => value.HasValue ? $"{value.Value:0}%" : "--";
 
     private static string FormatTemperature(string label, double? value) =>
-        value.HasValue ? $"{label} {value.Value:0}℃" : $"{label} --";
+        value.HasValue ? $"{label} {value.Value:0}℃" : $"{label} --℃";
 
     private static string FormatSpeed(double? bytesPerSecond)
     {
