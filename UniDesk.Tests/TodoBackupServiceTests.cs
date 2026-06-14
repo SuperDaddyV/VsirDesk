@@ -13,8 +13,18 @@ public class TodoBackupServiceTests
     [Fact]
     public async Task ExportAndImport_ShouldIncludeQuickNotes()
     {
-        var (db, todoService, quickNoteService, quickTextService, backupService) = await InitAsync();
+        var (db, todoService, quickNoteService, quickTextService, shortcutService, settingsService, backupService) = await InitAsync();
 
+        settingsService.SetValue("PanelWidth", "480");
+        settingsService.SetValue("ModuleSettings", "[{\"moduleId\":\"QuickText\",\"displayName\":\"快捷文本\",\"isEnabled\":true,\"sortOrder\":0}]");
+        await settingsService.FlushPendingSavesAsync();
+        await shortcutService.CreateShortcutAsync(new ShortcutItem
+        {
+            Name = "文件夹",
+            Path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            Type = ShortcutType.Folder,
+            SortOrder = 0
+        });
         await todoService.CreateTodoAsync(new TodoItem { Title = "待办" });
         await quickNoteService.CreateQuickNoteAsync(new QuickNote
         {
@@ -30,6 +40,10 @@ public class TodoBackupServiceTests
         });
 
         await backupService.ExportToFileAsync(_backupFile);
+        settingsService.SetValue("PanelWidth", "320");
+        settingsService.SetValue("ModuleSettings", "");
+        await settingsService.FlushPendingSavesAsync();
+        await db.ExecuteNonQueryAsync("DELETE FROM Shortcuts");
         await db.ExecuteNonQueryAsync("DELETE FROM Todos");
         await db.ExecuteNonQueryAsync("DELETE FROM QuickNotes");
         await db.ExecuteNonQueryAsync("DELETE FROM ClipboardHistory");
@@ -37,10 +51,15 @@ public class TodoBackupServiceTests
 
         var result = await backupService.ImportFromFileAsync(_backupFile);
 
+        Assert.True(result.SettingCount > 0);
+        Assert.Equal(1, result.ShortcutCount);
         Assert.Equal(1, result.TodoCount);
         Assert.Equal(1, result.QuickNoteCount);
         Assert.Equal(1, result.ClipboardHistoryCount);
         Assert.Equal(1, result.TextSnippetCount);
+        Assert.Equal("480", settingsService.GetValue("PanelWidth", ""));
+        Assert.Contains("QuickText", settingsService.GetValue("ModuleSettings", ""));
+        Assert.Single(await shortcutService.GetAllShortcutsAsync());
         Assert.Single(await todoService.GetAllTodosAsync());
         var notes = await quickNoteService.GetAllQuickNotesAsync();
         Assert.Single(notes);
@@ -54,7 +73,7 @@ public class TodoBackupServiceTests
     [Fact]
     public async Task ImportFromFileAsync_ShouldAcceptOldTodoOnlyBackup()
     {
-        var (_, todoService, quickNoteService, quickTextService, backupService) = await InitAsync();
+        var (_, todoService, quickNoteService, quickTextService, shortcutService, _, backupService) = await InitAsync();
         await File.WriteAllTextAsync(
             _backupFile,
             """
@@ -74,10 +93,13 @@ public class TodoBackupServiceTests
 
         var result = await backupService.ImportFromFileAsync(_backupFile);
 
+        Assert.Equal(0, result.SettingCount);
+        Assert.Equal(0, result.ShortcutCount);
         Assert.Equal(1, result.TodoCount);
         Assert.Equal(0, result.QuickNoteCount);
         Assert.Equal(0, result.ClipboardHistoryCount);
         Assert.Equal(0, result.TextSnippetCount);
+        Assert.Empty(await shortcutService.GetAllShortcutsAsync());
         Assert.Single(await todoService.GetAllTodosAsync());
         Assert.Empty(await quickNoteService.GetAllQuickNotesAsync());
         Assert.Empty(await quickTextService.GetClipboardHistoryAsync());
@@ -86,7 +108,7 @@ public class TodoBackupServiceTests
         Cleanup();
     }
 
-    private async Task<(DatabaseService Db, TodoService TodoService, QuickNoteService QuickNoteService, QuickTextService QuickTextService, TodoBackupService BackupService)> InitAsync()
+    private async Task<(DatabaseService Db, TodoService TodoService, QuickNoteService QuickNoteService, QuickTextService QuickTextService, ShortcutService ShortcutService, SettingsService SettingsService, TodoBackupService BackupService)> InitAsync()
     {
         var db = new DatabaseService($"Data Source={_testDbFile}");
         await db.InitializeAsync();
@@ -94,8 +116,15 @@ public class TodoBackupServiceTests
         var quickNoteService = new QuickNoteService(db);
         var settingsService = new SettingsService(db);
         var quickTextService = new QuickTextService(db, settingsService);
-        var backupService = new TodoBackupService(todoService, quickNoteService, quickTextService, db);
-        return (db, todoService, quickNoteService, quickTextService, backupService);
+        var shortcutService = new ShortcutService(db);
+        var backupService = new TodoBackupService(
+            todoService,
+            quickNoteService,
+            quickTextService,
+            shortcutService,
+            settingsService,
+            db);
+        return (db, todoService, quickNoteService, quickTextService, shortcutService, settingsService, backupService);
     }
 
     private void Cleanup()

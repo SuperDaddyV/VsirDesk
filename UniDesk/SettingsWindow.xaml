@@ -502,7 +502,7 @@
 
                     <TextBlock Text="系统设置" Style="{StaticResource DlgSectionTitle}"/>
                     <Grid Margin="0,0,0,10">
-                        <TextBlock Text="待办事项、快速便签与快捷文本备份还原"
+                        <TextBlock Text="设置、快捷方式与本地数据备份还原"
                                    FontSize="12"
                                    Foreground="{StaticResource DlgTextPrimary}"
                                    VerticalAlignment="Center"/>

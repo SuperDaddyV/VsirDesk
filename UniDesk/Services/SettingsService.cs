@@ -82,7 +82,13 @@ public class SettingsService : ISettingsService, IDisposable
 
     public void FlushPendingSaves()
     {
-        _ = FlushPendingSavesAsync();
+        try
+        {
+            FlushPendingSavesAsync().GetAwaiter().GetResult();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     private void QueueSave(string key, string? value)
@@ -180,7 +186,7 @@ public class SettingsService : ISettingsService, IDisposable
     {
         _flushCts?.Cancel();
         _flushCts?.Dispose();
-        _saveLock.Dispose();
         FlushPendingSaves();
+        _saveLock.Dispose();
     }
 }

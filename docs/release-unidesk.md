@@ -1,5 +1,31 @@
 # UniDesk Release Notes
 
+## v1.3.3
+
+This release prepares the current main branch for a new public installer after the v1.3.2 release.
+
+### Changes
+
+- Expanded data backup and restore to include settings, module configuration, and shortcuts.
+- Preserved compatibility with older todo-only backup files.
+- Removed optional `secrets.json` packaging from the project and installer output.
+- Improved settings persistence during app exit.
+- Improved cleanup of network resources used by location lookup.
+- Polished the hardware monitor layout by removing unnecessary empty space.
+- Polished shortcut item alignment so icons and labels stay visually centered.
+- Updated application, installer, and README version references to `1.3.3`.
+
+### 中文说明
+
+- 扩展数据备份与还原范围，新增设置、模块配置和快捷方式。
+- 保持对旧版仅待办备份文件的兼容。
+- 移除项目和安装包中可选打包 `secrets.json` 的规则。
+- 改进应用退出时的设置保存可靠性。
+- 改进定位服务使用的网络资源释放。
+- 优化硬件监视模块布局，减少不必要留白。
+- 优化快捷方式图标和名称对齐，让列表视觉更整齐。
+- 将应用、安装包和 README 版本引用更新为 `1.3.3`。
+
 ## v1.3.2
 
 This release updates UniDesk into a more complete desktop sidebar tool.

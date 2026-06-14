@@ -520,7 +520,7 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             await _todoBackupService.ExportToFileAsync(dialog.FileName);
-            _notificationService.ShowSuccessMessage("UniDesk 数据已备份。");
+            _notificationService.ShowSuccessMessage("UniDesk 数据已备份，请妥善保管备份文件。");
         }
         catch (Exception ex)
         {
@@ -532,7 +532,7 @@ public partial class SettingsViewModel : ObservableObject
     private async Task RestoreTodosAsync()
     {
         var confirmed = _notificationService.ShowConfirmDialog(
-            "还原将覆盖备份文件中包含的待办事项、快速便签和快捷文本，是否继续？",
+            "还原将覆盖备份文件中包含的设置、快捷方式、待办事项、快速便签和快捷文本，是否继续？",
             "确认还原");
         if (!confirmed)
         {
@@ -553,11 +553,21 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var result = await _todoBackupService.ImportFromFileAsync(dialog.FileName);
+            if (result.SettingCount > 0)
+            {
+                var startupText = _settingsService.GetValue("Startup", StartupEnabled.ToString());
+                StartupEnabled = bool.TryParse(startupText, out var startupEnabled) && startupEnabled;
+                ApplyStartupSetting();
+                _mainWindowViewModel.ApplyWindowSettings();
+                LoadSettings();
+            }
+
+            await _mainWindowViewModel.ReloadShortcutsAsync();
             await _mainWindowViewModel.ReloadTodosAsync();
             await _mainWindowViewModel.ReloadQuickNotesAsync();
             await _mainWindowViewModel.ReloadQuickTextAsync();
             _notificationService.ShowSuccessMessage(
-                $"已还原 {result.TodoCount} 条待办事项，{result.QuickNoteCount} 条便签，{result.ClipboardHistoryCount} 条历史，{result.TextSnippetCount} 条常用短语。");
+                $"已还原 {result.SettingCount} 项设置，{result.ShortcutCount} 个快捷方式，{result.TodoCount} 条待办事项，{result.QuickNoteCount} 条便签，{result.ClipboardHistoryCount} 条历史，{result.TextSnippetCount} 条常用短语。");
         }
         catch (Exception ex)
         {

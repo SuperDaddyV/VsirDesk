@@ -628,7 +628,6 @@
                                 Grid.Row="1"
                                 Style="{StaticResource ModuleCardStyle}"
                                 Margin="0,0,0,6"
-                                MinHeight="122"
                                 Padding="13,8"
                                 ClipToBounds="True">
                             <Grid>
@@ -852,8 +851,8 @@
                                     </ItemsControl.ItemContainerStyle>
                                     <ItemsControl.Resources>
                                         <DataTemplate DataType="{x:Type models:ShortcutItem}">
-                                            <Grid Height="64"
-                                                  Margin="0,0,0,2"
+                                            <Grid Height="72"
+                                                  Margin="0,0,0,6"
                                                   Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
                                                   AllowDrop="True"
                                                   PreviewMouseLeftButtonDown="ShortcutItem_OnPreviewMouseLeftButtonDown"
@@ -880,11 +879,12 @@
                                                                   CommandParameter="{Binding}"/>
                                                     </ContextMenu>
                                                 </Grid.ContextMenu>
-                                                <StackPanel Orientation="Horizontal"
+                                                <StackPanel Width="82"
                                                             HorizontalAlignment="Center"
                                                             VerticalAlignment="Top">
                                                     <Button Width="47"
                                                             Height="47"
+                                                            HorizontalAlignment="Center"
                                                             Command="{Binding DataContext.LaunchShortcutCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                             CommandParameter="{Binding}"
                                                             ToolTip="{Binding Name}">
@@ -935,9 +935,10 @@
                                                                FontSize="{Binding DataContext.FontScale, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
                                                                Foreground="{DynamicResource PrimaryTextBrush}"
                                                                TextTrimming="CharacterEllipsis"
-                                                               VerticalAlignment="Center"
-                                                               Margin="4,0,0,0"
-                                                               MaxWidth="28"
+                                                               TextAlignment="Center"
+                                                               HorizontalAlignment="Center"
+                                                               Margin="0,4,0,0"
+                                                               MaxWidth="76"
                                                                IsHitTestVisible="False"
                                                                Cursor="Arrow"/>
                                                 </StackPanel>
@@ -960,14 +961,15 @@
                                         </DataTemplate>
 
                                         <DataTemplate DataType="{x:Type helpers:AddShortcutPlaceholder}">
-                                            <Grid Height="64" Margin="0,0,0,2">
-                                                <StackPanel Orientation="Horizontal"
+                                            <Grid Height="72" Margin="0,0,0,6">
+                                                <StackPanel Width="82"
                                                             HorizontalAlignment="Center"
                                                             VerticalAlignment="Top">
                                                     <Button x:Name="AddShortcutButton"
                                                             Style="{StaticResource ShortcutIconButtonStyle}"
                                                             Width="47"
                                                             Height="47"
+                                                            HorizontalAlignment="Center"
                                                             Command="{Binding DataContext.OpenShortcutAddMenuCommand, RelativeSource={RelativeSource AncestorType=Window}}">
                                                         <Border Width="47"
                                                                 Height="47"
@@ -983,7 +985,14 @@
                                                                        VerticalAlignment="Center"/>
                                                         </Border>
                                                     </Button>
-                                                    <Border Width="24" Margin="4,0,0,0" IsHitTestVisible="False"/>
+                                                    <TextBlock Text="添加"
+                                                               FontSize="{Binding DataContext.FontScale, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ScaledFontSizeConverter}, ConverterParameter=10}"
+                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                               TextAlignment="Center"
+                                                               HorizontalAlignment="Center"
+                                                               Margin="0,4,0,0"
+                                                               MaxWidth="76"
+                                                               IsHitTestVisible="False"/>
                                                 </StackPanel>
 
                                                 <Popup PlacementTarget="{Binding ElementName=AddShortcutButton}"

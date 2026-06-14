@@ -61,6 +61,7 @@ public class ShortcutService : IShortcutService
     {
         try
         {
+            var createdAt = shortcut.CreatedAt == default ? DateTime.UtcNow : shortcut.CreatedAt;
             var id = await _databaseService.QuerySingleAsync(
                 "INSERT INTO Shortcuts (Name, Path, Type, IconPath, SortOrder, CreatedAt, LaunchArguments) VALUES (@p0, @p1, @p2, @p3, @p4, @p5, @p6) RETURNING Id",
                 reader => reader.GetInt32(0),
@@ -69,7 +70,7 @@ public class ShortcutService : IShortcutService
                 shortcut.Type.ToString(),
                 shortcut.IconPath,
                 shortcut.SortOrder,
-                DateTime.UtcNow.ToString("o"),
+                createdAt.ToString("o"),
                 shortcut.LaunchArguments
             );
 

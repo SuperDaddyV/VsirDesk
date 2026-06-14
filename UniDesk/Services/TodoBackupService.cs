@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using UniDesk.Helpers;
 using UniDesk.Models;
 
 namespace UniDesk.Services;
@@ -12,7 +13,16 @@ public class TodoBackupService : ITodoBackupService
     private readonly ITodoService _todoService;
     private readonly IQuickNoteService _quickNoteService;
     private readonly IQuickTextService _quickTextService;
+    private readonly IShortcutService _shortcutService;
+    private readonly ISettingsService _settingsService;
     private readonly IDatabaseService _databaseService;
+
+    private static readonly HashSet<string> ExcludedSettingKeys = new(StringComparer.Ordinal)
+    {
+        "DatabaseVersion",
+        WeatherApiDefaults.DefaultApiKeySettingKey,
+        WeatherApiDefaults.DefaultApiHostSettingKey
+    };
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -28,11 +38,15 @@ public class TodoBackupService : ITodoBackupService
         ITodoService todoService,
         IQuickNoteService quickNoteService,
         IQuickTextService quickTextService,
+        IShortcutService shortcutService,
+        ISettingsService settingsService,
         IDatabaseService databaseService)
     {
         _todoService = todoService;
         _quickNoteService = quickNoteService;
         _quickTextService = quickTextService;
+        _shortcutService = shortcutService;
+        _settingsService = settingsService;
         _databaseService = databaseService;
     }
 
@@ -42,10 +56,14 @@ public class TodoBackupService : ITodoBackupService
         var quickNotes = await _quickNoteService.GetAllQuickNotesAsync();
         var clipboardHistory = await _quickTextService.GetClipboardHistoryAsync(10_000);
         var textSnippets = await _quickTextService.GetTextSnippetsAsync();
+        var shortcuts = await _shortcutService.GetAllShortcutsAsync();
+        var settings = await GetSettingsBackupAsync();
         var payload = new TodoBackupFile
         {
-            Version = 3,
+            Version = 4,
             ExportedAt = DateTime.UtcNow,
+            Settings = settings,
+            Shortcuts = shortcuts.Select(ShortcutBackupEntry.FromShortcut).ToList(),
             Todos = todos.Select(TodoBackupEntry.FromTodo).ToList(),
             QuickNotes = quickNotes.Select(QuickNoteBackupEntry.FromQuickNote).ToList(),
             ClipboardHistory = clipboardHistory.Select(ClipboardHistoryBackupEntry.FromHistory).ToList(),
@@ -62,17 +80,41 @@ public class TodoBackupService : ITodoBackupService
         var payload = JsonSerializer.Deserialize<TodoBackupFile>(json, JsonOptions)
                       ?? throw new InvalidDataException("备份文件格式无效。");
 
-        if ((payload.Todos == null || payload.Todos.Count == 0) &&
-            (payload.QuickNotes == null || payload.QuickNotes.Count == 0) &&
-            (payload.ClipboardHistory == null || payload.ClipboardHistory.Count == 0) &&
-            (payload.TextSnippets == null || payload.TextSnippets.Count == 0))
+        if (!HasRestorableData(payload))
         {
             throw new InvalidDataException("备份文件中没有可还原的数据。");
         }
 
         var result = new TodoBackupImportResult();
 
-        if (payload.Todos is { Count: > 0 })
+        if (payload.Settings != null)
+        {
+            result.SettingCount = await RestoreSettingsAsync(payload.Settings);
+        }
+
+        if (payload.Shortcuts != null)
+        {
+            await _databaseService.ExecuteNonQueryAsync("DELETE FROM Shortcuts");
+
+            foreach (var entry in payload.Shortcuts)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Name) || string.IsNullOrWhiteSpace(entry.Path))
+                {
+                    continue;
+                }
+
+                var shortcut = entry.ToShortcut();
+                var id = await _shortcutService.CreateShortcutAsync(shortcut);
+                if (id > 0)
+                {
+                    result.ShortcutCount++;
+                }
+            }
+
+            await _shortcutService.NormalizeSortOrderAsync();
+        }
+
+        if (payload.Todos != null)
         {
             await _databaseService.ExecuteNonQueryAsync("DELETE FROM Todos");
 
@@ -88,7 +130,7 @@ public class TodoBackupService : ITodoBackupService
             }
         }
 
-        if (payload.QuickNotes is { Count: > 0 })
+        if (payload.QuickNotes != null)
         {
             await _databaseService.ExecuteNonQueryAsync("DELETE FROM QuickNotes");
 
@@ -104,7 +146,7 @@ public class TodoBackupService : ITodoBackupService
             }
         }
 
-        if (payload.ClipboardHistory is { Count: > 0 })
+        if (payload.ClipboardHistory != null)
         {
             await _databaseService.ExecuteNonQueryAsync("DELETE FROM ClipboardHistory");
 
@@ -134,7 +176,7 @@ public class TodoBackupService : ITodoBackupService
             }
         }
 
-        if (payload.TextSnippets is { Count: > 0 })
+        if (payload.TextSnippets != null)
         {
             await _databaseService.ExecuteNonQueryAsync("DELETE FROM TextSnippets");
 
@@ -153,14 +195,111 @@ public class TodoBackupService : ITodoBackupService
         return result;
     }
 
+    private async Task<Dictionary<string, string?>> GetSettingsBackupAsync()
+    {
+        var settings = await _databaseService.QueryAsync(
+            "SELECT Key, Value FROM Settings ORDER BY Key",
+            reader => new KeyValuePair<string, string?>(
+                reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1)));
+
+        return settings
+            .Where(setting => !ExcludedSettingKeys.Contains(setting.Key))
+            .ToDictionary(setting => setting.Key, setting => setting.Value, StringComparer.Ordinal);
+    }
+
+    private async Task<int> RestoreSettingsAsync(Dictionary<string, string?> settings)
+    {
+        var restored = 0;
+        foreach (var (key, value) in settings)
+        {
+            if (string.IsNullOrWhiteSpace(key) || ExcludedSettingKeys.Contains(key))
+            {
+                continue;
+            }
+
+            var normalizedValue = key == DashboardModuleCatalog.SettingsKey
+                ? NormalizeModuleSettingsJson(value)
+                : value;
+
+            await _settingsService.SetSettingAsync(key, normalizedValue);
+            restored++;
+        }
+
+        return restored;
+    }
+
+    private static string? NormalizeModuleSettingsJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return JsonSerializer.Serialize(DashboardModuleCatalog.CreateDefaultModules(), JsonOptions);
+        }
+
+        try
+        {
+            var modules = JsonSerializer.Deserialize<List<ModuleSetting>>(json, JsonOptions);
+            return JsonSerializer.Serialize(DashboardModuleCatalog.Normalize(modules), JsonOptions);
+        }
+        catch
+        {
+            return JsonSerializer.Serialize(DashboardModuleCatalog.CreateDefaultModules(), JsonOptions);
+        }
+    }
+
+    private static bool HasRestorableData(TodoBackupFile payload) =>
+        payload.Settings != null ||
+        payload.Shortcuts != null ||
+        payload.Todos != null ||
+        payload.QuickNotes != null ||
+        payload.ClipboardHistory != null ||
+        payload.TextSnippets != null;
+
     private sealed class TodoBackupFile
     {
         public int Version { get; set; }
         public DateTime ExportedAt { get; set; }
-        public List<TodoBackupEntry> Todos { get; set; } = [];
-        public List<QuickNoteBackupEntry> QuickNotes { get; set; } = [];
-        public List<ClipboardHistoryBackupEntry> ClipboardHistory { get; set; } = [];
-        public List<TextSnippetBackupEntry> TextSnippets { get; set; } = [];
+        public Dictionary<string, string?>? Settings { get; set; }
+        public List<ShortcutBackupEntry>? Shortcuts { get; set; }
+        public List<TodoBackupEntry>? Todos { get; set; }
+        public List<QuickNoteBackupEntry>? QuickNotes { get; set; }
+        public List<ClipboardHistoryBackupEntry>? ClipboardHistory { get; set; }
+        public List<TextSnippetBackupEntry>? TextSnippets { get; set; }
+    }
+
+    private sealed class ShortcutBackupEntry
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Path { get; set; } = string.Empty;
+        public string? LaunchArguments { get; set; }
+        public ShortcutType Type { get; set; } = ShortcutType.Application;
+        public int SortOrder { get; set; }
+        public DateTime CreatedAt { get; set; }
+
+        public static ShortcutBackupEntry FromShortcut(ShortcutItem shortcut) => new()
+        {
+            Name = shortcut.Name,
+            Path = shortcut.Path,
+            LaunchArguments = shortcut.LaunchArguments,
+            Type = shortcut.Type,
+            SortOrder = shortcut.SortOrder,
+            CreatedAt = shortcut.CreatedAt
+        };
+
+        public ShortcutItem ToShortcut()
+        {
+            var now = DateTime.UtcNow;
+            return new ShortcutItem
+            {
+                Name = Name ?? string.Empty,
+                Path = Path ?? string.Empty,
+                LaunchArguments = LaunchArguments,
+                Type = Type,
+                SortOrder = Math.Max(0, SortOrder),
+                CreatedAt = CreatedAt == default ? now : CreatedAt,
+                IconLookupPath = Path
+            };
+        }
     }
 
     private sealed class TodoBackupEntry

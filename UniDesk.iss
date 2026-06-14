@@ -5,7 +5,7 @@
 ;   dotnet publish UniDesk\UniDesk.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o publish\win-x64
 
 #define MyAppName "UniDesk"
-#define MyAppVersion "1.3.2"
+#define MyAppVersion "1.3.3"
 #define MyAppPublisher "UniDesk"
 #define MyAppURL "https://github.com/SuperDaddyV/UniDesk"
 #define MyAppExeName "UniDesk.exe"
@@ -62,8 +62,6 @@ Name: "{localappdata}\UniDesk\cache"
 Source: "{#MyAppSourceDir}\*"; DestDir: "{app}"; Excludes: "icon\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Package the complete icon assets from the project source directory.
 Source: "{#MyAppIconSourceDir}\*"; DestDir: "{app}\icon"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Package optional local secrets.json when present.
-Source: "UniDesk\secrets.json"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon\{#MyAppIconName}"

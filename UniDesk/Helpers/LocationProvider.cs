@@ -13,7 +13,7 @@ public interface ILocationProvider
     Task<string?> ResolveCityAsync(CancellationToken cancellationToken = default);
 }
 
-public class LocationProvider : ILocationProvider
+public class LocationProvider : ILocationProvider, IDisposable
 {
     private const string IpApiEndpoint =
         "http://ip-api.com/json/?lang=zh-CN&fields=status,city,lat,lon,regionName";
@@ -284,5 +284,10 @@ public class LocationProvider : ILocationProvider
 
         [JsonPropertyName("adm2")]
         public string? Adm2 { get; set; }
+    }
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
     }
 }
